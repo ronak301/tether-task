@@ -4,7 +4,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams } from 'expo-router';
 import { useDebouncedNavigation } from '@/hooks/use-debounced-navigation';
 import { AlertCircle, ChevronLeft, Copy, Eye, EyeOff } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
@@ -19,9 +19,14 @@ export default function SecureWalletScreen() {
   const [showPhrase, setShowPhrase] = useState(true);
   const [isGenerating, setIsGenerating] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [clipboardCountdown, setClipboardCountdown] = useState<number | null>(null);
+  const clipboardTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     generatePhrase();
+    return () => {
+      if (clipboardTimerRef.current) clearInterval(clipboardTimerRef.current);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -42,9 +47,27 @@ export default function SecureWalletScreen() {
     }
   };
 
+  const CLIPBOARD_CLEAR_SECONDS = 60;
+
   const handleCopyPhrase = async () => {
     await Clipboard.setStringAsync(mnemonic.join(' '));
-    toast.success('Secret phrase copied to clipboard');
+    toast.success('Copied — will be cleared from clipboard in 60s');
+
+    // Start countdown and auto-clear clipboard after 60 seconds.
+    if (clipboardTimerRef.current) clearInterval(clipboardTimerRef.current);
+    setClipboardCountdown(CLIPBOARD_CLEAR_SECONDS);
+
+    clipboardTimerRef.current = setInterval(() => {
+      setClipboardCountdown(prev => {
+        if (prev === null || prev <= 1) {
+          clearInterval(clipboardTimerRef.current!);
+          clipboardTimerRef.current = null;
+          Clipboard.setStringAsync('');
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
   };
 
   const handleNext = () => {
@@ -121,6 +144,11 @@ export default function SecureWalletScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
+            {clipboardCountdown !== null && (
+              <Text style={styles.clipboardWarning}>
+                Clipboard clears in {clipboardCountdown}s
+              </Text>
+            )}
           </>
         )}
       </ScrollView>
@@ -168,4 +196,5 @@ const styles = StyleSheet.create({
   errorText: { flex: 1, color: colors.danger, fontSize: 14, marginLeft: 12 },
   retryButton: { backgroundColor: colors.primary, height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   retryButtonText: { fontSize: 16, fontWeight: '600', color: colors.black },
+  clipboardWarning: { fontSize: 12, color: colors.warning, textAlign: 'center', marginTop: -16, marginBottom: 24 },
 });

@@ -57,7 +57,7 @@ const wdkNetworkConfigs: WdkConfigs = {
       blockchain: 'tron',
       config: {
         chainId: 3448148188,
-        provider: 'https://trongrid.io',
+        provider: 'https://api.trongrid.io',
         gasFreeProvider: 'https://gasfree.io',
         apiKey: process.env.EXPO_PUBLIC_TRON_API_KEY!,
         apiSecret: process.env.EXPO_PUBLIC_TRON_API_SECRET!,

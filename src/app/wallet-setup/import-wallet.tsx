@@ -1,7 +1,7 @@
 import { SeedPhrase } from '@/components/SeedPhrase';
 import * as Clipboard from 'expo-clipboard';
 import { useDebouncedNavigation } from '@/hooks/use-debounced-navigation';
-import { ChevronLeft, Download, FileText, ScanText } from 'lucide-react-native';
+import { ChevronLeft, Download, FileText, Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { colors } from '@/constants/colors';
 import {
@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { validateMnemonic } from 'bip39';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
@@ -61,33 +62,12 @@ export default function ImportWalletScreen() {
     }
   };
 
-  const handleScanText = () => {
-    Alert.alert('Scan Text', 'Camera functionality would open here to scan QR code or text', [
-      { text: 'OK' },
-    ]);
+  const handleClear = () => {
+    setSecretWords(Array(12).fill(''));
   };
 
   const isFormValid = () => {
     return secretWords.every(word => word.trim().length > 0);
-  };
-
-  const validateSeedPhrase = (phrase: string): boolean => {
-    const words = phrase
-      .trim()
-      .split(' ')
-      .filter(word => word.length > 0);
-
-    // Check if we have exactly 12 or 24 words
-    if (words.length !== 12 && words.length !== 24) {
-      return false;
-    }
-
-    // Basic word validation - each word should be at least 3 characters
-    const validWords = words.every(
-      word => word.length >= 3 && /^[a-z]+$/.test(word) // only lowercase letters
-    );
-
-    return validWords;
   };
 
   const handleImportWallet = () => {
@@ -98,20 +78,17 @@ export default function ImportWalletScreen() {
       return;
     }
 
-    // Join the words into a seed phrase
-    const seedPhrase = secretWords.join(' ');
+    const seedPhrase = secretWords.map(w => w.trim().toLowerCase()).join(' ');
 
-    // Validate the seed phrase
-    if (!validateSeedPhrase(seedPhrase)) {
+    if (!validateMnemonic(seedPhrase)) {
       Alert.alert(
         'Invalid Seed Phrase',
-        'Please check your seed phrase. Make sure all words are spelled correctly and contain only lowercase letters.',
+        'The phrase you entered is not a valid BIP39 mnemonic. Please check each word is spelled correctly.',
         [{ text: 'OK' }]
       );
       return;
     }
 
-    // Navigate to name wallet screen with the seed phrase
     router.push({
       pathname: './import-name-wallet',
       params: { seedPhrase: encodeURIComponent(seedPhrase) },
@@ -142,9 +119,9 @@ export default function ImportWalletScreen() {
               <Text style={styles.actionButtonText}>Paste</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionButton} onPress={handleScanText}>
-              <ScanText size={20} color={colors.primary} />
-              <Text style={styles.actionButtonText}>Scan Text</Text>
+            <TouchableOpacity style={styles.actionButton} onPress={handleClear}>
+              <Trash2 size={20} color={colors.primary} />
+              <Text style={styles.actionButtonText}>Clear</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>

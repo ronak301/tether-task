@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
+import { wordlists } from 'bip39';
 import { useDebouncedNavigation } from '@/hooks/use-debounced-navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft } from 'lucide-react-native';
@@ -24,41 +25,37 @@ export default function ConfirmPhraseScreen() {
   const [wordPositions, setWordPositions] = useState<WordPosition[]>([]);
 
   useEffect(() => {
-    // Parse mnemonic from params
     const mnemonicString = params.mnemonic as string;
-    if (mnemonicString) {
-      const words = mnemonicString.split(',');
+    if (!mnemonicString) return;
 
-      // Select 4 random positions to verify
-      const positions = [2, 4, 6, 11]; // Word #3, #5, #7, #12 (0-indexed + 1)
-      const verificationWords: WordPosition[] = positions.map(pos => {
-        const correctWord = words[pos];
-        // Generate fake options
-        const fakeWords = [
-          'galaxy',
-          'wave',
-          'stardust',
-          'whisper',
-          'nebula',
-          'resonance',
-          'comet',
-          'current',
-          'flow',
-          'zenith',
-        ].filter(w => w !== correctWord);
+    const words = mnemonicString.split(',');
+    const bip39Words = wordlists.english;
 
-        // Shuffle options
-        const options = [correctWord, fakeWords[0], fakeWords[1]].sort(() => Math.random() - 0.5);
-
-        return {
-          position: pos + 1, // 1-indexed for display
-          word: correctWord,
-          options: options,
-        };
-      });
-
-      setWordPositions(verificationWords);
+    // Pick 3 random unique positions from the 12 words.
+    const allIndices = Array.from({ length: 12 }, (_, i) => i);
+    for (let i = allIndices.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [allIndices[i], allIndices[j]] = [allIndices[j], allIndices[i]];
     }
+    const positions = allIndices.slice(0, 3);
+
+    const verificationWords: WordPosition[] = positions.map(pos => {
+      const correctWord = words[pos];
+
+      // Pick 2 random BIP39 words that are not the correct word as distractors.
+      const distractors: string[] = [];
+      while (distractors.length < 2) {
+        const candidate = bip39Words[Math.floor(Math.random() * bip39Words.length)];
+        if (candidate !== correctWord && !distractors.includes(candidate)) {
+          distractors.push(candidate);
+        }
+      }
+
+      const options = [correctWord, ...distractors].sort(() => Math.random() - 0.5);
+      return { position: pos + 1, word: correctWord, options };
+    });
+
+    setWordPositions(verificationWords);
   }, [params.mnemonic]);
 
   const handleWordSelect = (position: number, word: string) => {
