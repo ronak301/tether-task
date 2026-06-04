@@ -33,7 +33,7 @@ function parseWalletName(walletId: string): string {
 }
 
 export function WalletSwitcher({ isOpen, onClose }: WalletSwitcherProps) {
-  const { wallets, activeWalletId, setActiveWalletId } = useWalletManager();
+  const { wallets, activeWalletId, setActiveWalletId, unlock } = useWalletManager();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const bottomSheetRef = useRef<BottomSheet>(null);
@@ -65,13 +65,17 @@ export function WalletSwitcher({ isOpen, onClose }: WalletSwitcherProps) {
   }, [wallets]);
 
   const handleSelectWallet = useCallback(
-    (walletId: string) => {
+    async (walletId: string) => {
       if (walletId !== activeWalletId) {
+        // setActiveWalletId alone doesn't initialize the worklet for the new wallet.
+        // unlock() loads the encryption key from keychain and initializes WDK —
+        // no biometric prompt since the user is already in an active session.
         setActiveWalletId(walletId);
+        await unlock(walletId);
       }
       onClose();
     },
-    [activeWalletId, setActiveWalletId, onClose]
+    [activeWalletId, setActiveWalletId, unlock, onClose]
   );
 
   const handleAddWallet = useCallback(() => {

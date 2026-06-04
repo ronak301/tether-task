@@ -21,26 +21,19 @@ export interface Asset {
 }
 
 export const assetConfig: Record<string, AssetConfig> = {
-  btc: {
-    name: 'Bitcoin',
-    symbol: 'BTC',
-    icon: require('../../assets/images/tokens/bitcoin-btc-logo.png'),
-    color: '#ffffff',
-    supportedNetworks: [NetworkType.SEGWIT],
+  eth: {
+    name: 'Ethereum',
+    symbol: 'ETH',
+    icon: require('../../assets/images/chains/ethereum-eth-logo.png'),
+    color: '#627EEA',
+    supportedNetworks: [NetworkType.ETHEREUM],
   },
   usdt: {
     name: 'USD₮',
     symbol: 'USD₮',
     icon: require('../../assets/images/tokens/tether-usdt-logo.png'),
     color: '#ffffff',
-    supportedNetworks: [
-      NetworkType.ETHEREUM,
-      NetworkType.POLYGON,
-      NetworkType.ARBITRUM,
-      NetworkType.TON,
-      NetworkType.TRON,
-      NetworkType.SOLANA,
-    ],
+    supportedNetworks: [NetworkType.ETHEREUM],
   },
   xaut: {
     name: 'XAU₮',

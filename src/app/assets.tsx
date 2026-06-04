@@ -1,15 +1,10 @@
-import { useWalletManager, useBalancesForWallet } from '@tetherto/wdk-react-native-core';
-import { FiatCurrency, pricingService } from '@/services/pricing-service';
+import { useWalletManager } from '@tetherto/wdk-react-native-core';
 import { useDebouncedNavigation } from '@/hooks/use-debounced-navigation';
-import React, { useEffect, useState } from 'react';
+import { useWalletBalances, WalletAsset } from '@/hooks/use-wallet-balances';
+import React from 'react';
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Asset, assetConfig } from '../config/assets';
-import { AssetTicker } from '@/types/wdk-types';
-import { allAssets, fromSmallestUnit } from '@/config/wdk-assets';
 import formatAmount from '@/utils/format-amount';
-import getDisplaySymbol from '@/utils/get-display-symbol';
-import formatTokenAmount from '@/utils/format-token-amount';
 import Header from '@/components/header';
 import { colors } from '@/constants/colors';
 
@@ -17,49 +12,12 @@ export default function AssetsScreen() {
   const insets = useSafeAreaInsets();
   const router = useDebouncedNavigation();
   const { activeWalletId } = useWalletManager();
-  const { data: balanceResults, isLoading } = useBalancesForWallet(0, allAssets);
-  const [assets, setAssets] = useState<Asset[]>([]);
+  const { assets, isLoading } = useWalletBalances();
 
-  const getAssetsWithFiatValue = async () => {
-    if (!balanceResults?.length) return [];
-
-    const map = new Map<string, number>();
-    for (const result of balanceResults) {
-      if (!result.success || !result.balance) continue;
-      const asset = allAssets.find(a => a.getId() === result.assetId && a.getNetwork() === result.network);
-      if (!asset) continue;
-      map.set(result.assetId, (map.get(result.assetId) ?? 0) + fromSmallestUnit(result.balance, asset));
-    }
-
-    const promises = Array.from(map.entries()).map(async ([denomination, totalBalance]) => {
-      const config = assetConfig[denomination];
-      if (!config) return null;
-      const fiatValue = await pricingService.getFiatValue(totalBalance, denomination as AssetTicker, FiatCurrency.USD);
-      return {
-        id: denomination,
-        name: config.name,
-        symbol: getDisplaySymbol(denomination),
-        amount: formatTokenAmount(totalBalance, denomination as AssetTicker, false),
-        fiatValue,
-        fiatCurrency: FiatCurrency.USD,
-        icon: config.icon,
-        color: config.color,
-      };
-    });
-
-    return ((await Promise.all(promises)).filter(Boolean) as Asset[])
-      .sort((a, b) => b.fiatValue - a.fiatValue);
-  };
-
-  const handleAssetPress = (asset: Asset) => {
+  const handleAssetPress = (asset: WalletAsset) => {
     if (!activeWalletId) return;
     router.push({ pathname: '/token-details', params: { walletId: activeWalletId, token: asset.id } });
   };
-
-  useEffect(() => {
-    getAssetsWithFiatValue().then(setAssets);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [balanceResults]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>

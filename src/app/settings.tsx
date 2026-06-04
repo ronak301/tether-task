@@ -17,8 +17,13 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useDebouncedNavigation();
   const { activeWalletId, wallets, deleteWallet, setActiveWalletId, unlock, lock } = useWalletManager();
-  const { data: addresses } = useAddresses();
+  const { data: addresses, isLoading: isAddressLoading, loadAddresses } = useAddresses();
   const avatar = useWalletAvatar();
+
+  // Trigger address load when settings opens (in case wallet.tsx hasn't done it yet).
+  React.useEffect(() => {
+    loadAddresses([0], ['ethereum']);
+  }, [loadAddresses]);
 
   const handleDeleteWallet = () => {
     Alert.alert(
@@ -101,15 +106,21 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {/* Addresses */}
-        {addresses && addresses.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Shield size={20} color={colors.primary} />
-              <Text style={styles.sectionTitle}>Network Addresses</Text>
-            </View>
-            <View style={styles.addressCard}>
-              {addresses.map((item, index) => (
+        {/* Addresses — always visible, shows loading skeleton until address loads */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Shield size={20} color={colors.primary} />
+            <Text style={styles.sectionTitle}>Network Addresses</Text>
+          </View>
+          <View style={styles.addressCard}>
+            {isAddressLoading || !addresses?.length ? (
+              <View style={styles.addressRow}>
+                <Text style={styles.addressPlaceholder}>
+                  {isAddressLoading ? 'Loading address...' : 'No address available'}
+                </Text>
+              </View>
+            ) : (
+              addresses.map((item, index) => (
                 <TouchableOpacity
                   key={`${item.network}-${item.accountIndex}`}
                   style={[styles.addressRow, index === addresses.length - 1 && styles.addressRowLast]}
@@ -122,10 +133,10 @@ export default function SettingsScreen() {
                   </View>
                   <Copy size={18} color={colors.primary} />
                 </TouchableOpacity>
-              ))}
-            </View>
+              ))
+            )}
           </View>
-        )}
+        </View>
 
         {/* About */}
         <View style={styles.section}>
@@ -180,6 +191,7 @@ const styles = StyleSheet.create({
   infoLabel: { fontSize: 14, color: colors.textSecondary },
   infoValue: { fontSize: 14, color: colors.text, fontWeight: '500', flex: 1, textAlign: 'right', marginLeft: 12 },
   addressCard: { backgroundColor: colors.card, borderRadius: 12, padding: 16 },
+  addressPlaceholder: { fontSize: 14, color: colors.textTertiary, paddingVertical: 4 },
   addressRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.borderDark },
   addressRowLast: { borderBottomWidth: 0 },
   addressContent: { flex: 1, marginRight: 12 },

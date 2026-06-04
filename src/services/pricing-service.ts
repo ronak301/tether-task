@@ -36,7 +36,7 @@ class PricingService {
       // Fetch and update exchange rate cache
       this.fiatExchangeRateCache = {
         [FiatCurrency.USD]: {
-          [AssetTicker.BTC]: await this.provider.getLastPrice(AssetTicker.BTC, FiatCurrency.USD),
+          [AssetTicker.ETH]: await this.provider.getLastPrice(AssetTicker.ETH, FiatCurrency.USD),
           [AssetTicker.USDT]: 1,
           [AssetTicker.XAUT]: await this.provider.getLastPrice(AssetTicker.XAUT, FiatCurrency.USD),
         },
@@ -65,7 +65,7 @@ class PricingService {
     try {
       this.fiatExchangeRateCache = {
         [FiatCurrency.USD]: {
-          [AssetTicker.BTC]: await this.provider.getLastPrice(AssetTicker.BTC, FiatCurrency.USD),
+          [AssetTicker.ETH]: await this.provider.getLastPrice(AssetTicker.ETH, FiatCurrency.USD),
           [AssetTicker.USDT]: 1,
           [AssetTicker.XAUT]: await this.provider.getLastPrice(AssetTicker.XAUT, FiatCurrency.USD),
         },

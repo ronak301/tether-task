@@ -19,13 +19,6 @@ interface NetworkOption extends Network {
 // Network descriptions for receive flow
 const NETWORK_DESCRIPTIONS = {
   [NetworkType.ETHEREUM]: 'ERC20',
-  [NetworkType.POLYGON]: 'Polygon Network',
-  [NetworkType.ARBITRUM]: 'Arbitrum One',
-  [NetworkType.TON]: 'TON Network',
-  [NetworkType.TRON]: 'Tron Network',
-  [NetworkType.SOLANA]: 'Solana Network',
-  [NetworkType.SEGWIT]: 'Native Bitcoin Network',
-  [NetworkType.LIGHTNING]: 'Lightning Network',
 };
 
 export default function ReceiveSelectNetworkScreen() {

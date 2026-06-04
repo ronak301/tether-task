@@ -1,7 +1,8 @@
 import { BalanceLoader } from '@/components/BalanceLoader';
-import { useWalletManager, useAddresses, useBalancesForWallet, useWdkApp } from '@tetherto/wdk-react-native-core';
+import { useWalletManager, useAddresses, useWdkApp, useRefreshBalance } from '@tetherto/wdk-react-native-core';
 import { Balance } from '@tetherto/wdk-uikit-react-native';
-import { allAssets, fromSmallestUnit } from '@/config/wdk-assets';
+import { useIndexerBalances } from '@/hooks/use-indexer-balances';
+import { useWalletBalances } from '@/hooks/use-wallet-balances';
 import { useDebouncedNavigation } from '@/hooks/use-debounced-navigation';
 import {
   ArrowDownLeft,
@@ -13,7 +14,7 @@ import {
   Shield,
   Star,
 } from 'lucide-react-native';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -29,8 +30,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AssetConfig, assetConfig } from '../config/assets';
 import { FiatCurrency, pricingService } from '../services/pricing-service';
-import formatAmount from '@/utils/format-amount';
 import formatTokenAmount from '@/utils/format-token-amount';
+import formatAmount from '@/utils/format-amount';
 import formatUSDValue from '@/utils/format-usd-value';
 import useWalletAvatar from '@/hooks/use-wallet-avatar';
 import { useTransactions } from '@/hooks/use-transactions';
@@ -64,10 +65,11 @@ export default function WalletScreen() {
   const { activeWalletId, status, lock } = useWalletManager();
   const { state: appState } = useWdkApp();
   const { data: addressData } = useAddresses();
-  const { data: balanceResults, isLoading: isBalanceLoading } = useBalancesForWallet(0, allAssets);
+  const { assets: walletAssets, totalUSD, isLoading } = useWalletBalances();
+  const { refetch: refetchIndexer } = useIndexerBalances();
+  const { mutateAsync: refreshBalance } = useRefreshBalance();
   const walletTransactions = useTransactions();
   const [refreshing, setRefreshing] = useState(false);
-  const [aggregatedBalances, setAggregatedBalances] = useState<AggregatedBalance>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [mounted, setMounted] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -75,7 +77,6 @@ export default function WalletScreen() {
   const scrollY = useRef(new Animated.Value(0)).current;
 
   const hasWallet = !!activeWalletId;
-  const isLoading = isBalanceLoading;
 
   const parseWalletDisplayName = (walletId: string): string => {
     const match = walletId.match(/^wallet_(.+)_\d+$/);
@@ -102,37 +103,7 @@ export default function WalletScreen() {
     }
   }, [appState.status, router]);
 
-  // Build aggregated balances from new balance results
-  const getAggregatedBalances = async () => {
-    if (!balanceResults?.length) return [];
-
-    // Sum by token ID across all networks
-    const map = new Map<string, number>();
-    for (const result of balanceResults) {
-      if (!result.success || !result.balance) continue;
-      const asset = allAssets.find(a => a.getId() === result.assetId && a.getNetwork() === result.network);
-      if (!asset) continue;
-      const display = fromSmallestUnit(result.balance, asset);
-      map.set(result.assetId, (map.get(result.assetId) ?? 0) + display);
-    }
-
-    const promises = Array.from(map.entries()).map(async ([tokenId, totalBalance]) => {
-      const config = assetConfig[tokenId];
-      if (!config) return null;
-      const fiatValue = await pricingService.getFiatValue(totalBalance, tokenId as any, FiatCurrency.USD);
-      return { denomination: tokenId, balance: totalBalance, usdValue: fiatValue, config };
-    });
-
-    return (await Promise.all(promises))
-      .filter(Boolean)
-      .filter(a => a && a.balance > 0)
-      .sort((a, b) => (b?.usdValue ?? 0) - (a?.usdValue ?? 0));
-  };
-
-  // Calculate total portfolio value
-  const totalPortfolioValue = useMemo(() => {
-    return aggregatedBalances.reduce((sum, asset) => sum + (asset?.usdValue || 0), 0);
-  }, [aggregatedBalances]);
+  const totalPortfolioValue = totalUSD;
 
   // Animated border opacity based on scroll position
   const borderOpacity = scrollY.interpolate({
@@ -229,18 +200,18 @@ export default function WalletScreen() {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      await getAggregatedBalances().then(setAggregatedBalances);
+      // Invalidate the SDK's TanStack Query cache so useBalancesForWallet re-fetches
+      // fresh data from the RPC providers, then re-aggregate for display.
+      await Promise.all([
+        refreshBalance({ accountIndex: 0, type: 'wallet' }),
+        refetchIndexer(),
+      ]);
     } catch (error) {
       console.error('Failed to refresh wallet data:', error);
     } finally {
       setRefreshing(false);
     }
   };
-
-  useEffect(() => {
-    getAggregatedBalances().then(setAggregatedBalances);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [balanceResults]);
 
   useEffect(() => {
     getTransactions().then(setTransactions);
@@ -341,7 +312,7 @@ export default function WalletScreen() {
               isLoading={isLoading}
               Loader={BalanceLoader}
             />
-            {isBalanceLoading ? (
+            {isLoading ? (
               <View style={{ top: 16, marginRight: 8 }}>
                 <ActivityIndicator size="small" color={colors.primary} />
               </View>
@@ -351,43 +322,34 @@ export default function WalletScreen() {
 
         {/* Portfolio */}
         <View style={styles.portfolioSection}>
-          {aggregatedBalances.length > 0 ? (
-            aggregatedBalances.map(asset => {
-              if (!asset) return null;
-
-              return (
-                <TouchableOpacity
-                  key={asset.denomination}
-                  style={styles.assetRow}
-                  onPress={() => {
-                    if (activeWalletId) {
-                      router.push({
-                        pathname: '/token-details',
-                        params: {
-                          walletId: activeWalletId,
-                          token: asset.denomination.toUpperCase(),
-                        },
-                      });
-                    }
-                  }}
-                >
-                  <View style={styles.assetInfo}>
-                    <View style={[styles.assetIcon, { backgroundColor: asset.config.color }]}>
-                      <Image source={asset.config.icon} style={styles.assetIconImage} />
-                    </View>
-                    <View>
-                      <Text style={styles.assetName}>{asset.config.name}</Text>
-                    </View>
+          {walletAssets.length > 0 ? (
+            walletAssets.map(asset => (
+              <TouchableOpacity
+                key={asset.id}
+                style={styles.assetRow}
+                onPress={() => {
+                  if (activeWalletId) {
+                    router.push({
+                      pathname: '/token-details',
+                      params: { walletId: activeWalletId, token: asset.id.toUpperCase() },
+                    });
+                  }
+                }}
+              >
+                <View style={styles.assetInfo}>
+                  <View style={[styles.assetIcon, { backgroundColor: asset.color }]}>
+                    <Image source={asset.icon} style={styles.assetIconImage} />
                   </View>
-                  <View style={styles.assetBalance}>
-                    <Text style={styles.assetAmount}>
-                      {formatTokenAmount(asset.balance, asset.denomination as any)}
-                    </Text>
-                    <Text style={styles.assetValue}>{formatAmount(asset.usdValue)} USD</Text>
+                  <View>
+                    <Text style={styles.assetName}>{asset.name}</Text>
                   </View>
-                </TouchableOpacity>
-              );
-            })
+                </View>
+                <View style={styles.assetBalance}>
+                  <Text style={styles.assetAmount}>{asset.amount}</Text>
+                  <Text style={styles.assetValue}>{formatAmount(asset.fiatValue)} USD</Text>
+                </View>
+              </TouchableOpacity>
+            ))
           ) : (
             <View style={styles.noAssetsContainer}>
               <Text style={styles.noAssetsText}>No assets found</Text>
