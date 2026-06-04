@@ -45,7 +45,7 @@ export default function ImportNameWalletScreen() {
     try {
       const walletId = `wallet_${walletName.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}`;
       await restoreWallet(seedPhrase, walletId);
-      await setAvatar(selectedAvatar.emoji);
+      await setAvatar(selectedAvatar.emoji, walletId);
 
       toast.success('Your wallet has been imported successfully.');
 

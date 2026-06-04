@@ -15,10 +15,11 @@ const avatarOptions = [
   { id: 12, emoji: '😊', color: '#FFCC00' },
 ];
 
-const STORAGE_KEY_AVATAR = 'wallet_avatar';
+const storageKey = (walletId?: string) =>
+  walletId ? `wallet_avatar_${walletId}` : 'wallet_avatar';
 
-export const getAvatar = async () => {
-  const stored = await AsyncStorage.getItem(STORAGE_KEY_AVATAR);
+export const getAvatar = async (walletId?: string) => {
+  const stored = await AsyncStorage.getItem(storageKey(walletId));
   if (stored) {
     const found = avatarOptions.find(a => a.emoji === stored);
     return found ?? avatarOptions[0];
@@ -26,12 +27,12 @@ export const getAvatar = async () => {
   return avatarOptions[0];
 };
 
-export const setAvatar = async (avatar: string) => {
-  await AsyncStorage.setItem(STORAGE_KEY_AVATAR, avatar);
+export const setAvatar = async (avatar: string, walletId?: string) => {
+  await AsyncStorage.setItem(storageKey(walletId), avatar);
 };
 
-export const clearAvatar = async () => {
-  await AsyncStorage.removeItem(STORAGE_KEY_AVATAR);
+export const clearAvatar = async (walletId?: string) => {
+  await AsyncStorage.removeItem(storageKey(walletId));
 };
 
 export default avatarOptions;

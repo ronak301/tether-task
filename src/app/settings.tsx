@@ -16,7 +16,7 @@ import { NetworkType } from '@/config/networks';
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useDebouncedNavigation();
-  const { activeWalletId, deleteWallet, lock } = useWalletManager();
+  const { activeWalletId, wallets, deleteWallet, setActiveWalletId, unlock, lock } = useWalletManager();
   const { data: addresses } = useAddresses();
   const avatar = useWalletAvatar();
 
@@ -32,10 +32,25 @@ export default function SettingsScreen() {
           onPress: async () => {
             try {
               if (!activeWalletId) return;
+
+              // Find another wallet to switch to before deleting.
+              const nextWallet = wallets.find(
+                w => w.identifier !== activeWalletId && w.exists
+              );
+
               await deleteWallet(activeWalletId);
-              await clearAvatar();
-              toast.success('Wallet deleted successfully');
-              router.dismissAll('/');
+              await clearAvatar(activeWalletId);
+
+              if (nextWallet) {
+                // Stay in the session — load the next wallet without re-authenticating.
+                setActiveWalletId(nextWallet.identifier);
+                await unlock(nextWallet.identifier);
+                toast.success('Wallet deleted — switched to next wallet');
+                router.replace('/wallet');
+              } else {
+                toast.success('Wallet deleted successfully');
+                router.dismissAll('/');
+              }
             } catch (err) {
               console.error('Failed to delete wallet:', err);
               toast.error('Failed to delete wallet');

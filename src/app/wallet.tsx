@@ -1,11 +1,12 @@
 import { BalanceLoader } from '@/components/BalanceLoader';
-import { useWalletManager, useAddresses, useBalancesForWallet } from '@tetherto/wdk-react-native-core';
+import { useWalletManager, useAddresses, useBalancesForWallet, useWdkApp } from '@tetherto/wdk-react-native-core';
 import { Balance } from '@tetherto/wdk-uikit-react-native';
 import { allAssets, fromSmallestUnit } from '@/config/wdk-assets';
 import { useDebouncedNavigation } from '@/hooks/use-debounced-navigation';
 import {
   ArrowDownLeft,
   ArrowUpRight,
+  ChevronDown,
   Palette,
   QrCode,
   Settings,
@@ -33,6 +34,7 @@ import formatTokenAmount from '@/utils/format-token-amount';
 import formatUSDValue from '@/utils/format-usd-value';
 import useWalletAvatar from '@/hooks/use-wallet-avatar';
 import { useTransactions } from '@/hooks/use-transactions';
+import { WalletSwitcher } from '@/components/WalletSwitcher';
 import { colors } from '@/constants/colors';
 
 type AggregatedBalance = ({
@@ -60,6 +62,7 @@ export default function WalletScreen() {
   const insets = useSafeAreaInsets();
   const router = useDebouncedNavigation();
   const { activeWalletId, status, lock } = useWalletManager();
+  const { state: appState } = useWdkApp();
   const { data: addressData } = useAddresses();
   const { data: balanceResults, isLoading: isBalanceLoading } = useBalancesForWallet(0, allAssets);
   const walletTransactions = useTransactions();
@@ -67,11 +70,23 @@ export default function WalletScreen() {
   const [aggregatedBalances, setAggregatedBalances] = useState<AggregatedBalance>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [mounted, setMounted] = useState(false);
+  const [switcherOpen, setSwitcherOpen] = useState(false);
   const avatar = useWalletAvatar();
   const scrollY = useRef(new Animated.Value(0)).current;
 
   const hasWallet = !!activeWalletId;
   const isLoading = isBalanceLoading;
+
+  const parseWalletDisplayName = (walletId: string): string => {
+    const match = walletId.match(/^wallet_(.+)_\d+$/);
+    if (match) {
+      return match[1]
+        .split('_')
+        .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ');
+    }
+    return walletId;
+  };
 
   // Redirect to authorization if wallet is locked
   useEffect(() => {
@@ -79,6 +94,13 @@ export default function WalletScreen() {
       router.replace('/authorize');
     }
   }, [status, router]);
+
+  // Redirect to onboarding if no wallet exists (e.g. after deleting the last wallet)
+  useEffect(() => {
+    if (appState.status === 'NO_WALLET') {
+      router.replace('/onboarding');
+    }
+  }, [appState.status, router]);
 
   // Build aggregated balances from new balance results
   const getAggregatedBalances = async () => {
@@ -247,12 +269,19 @@ export default function WalletScreen() {
           },
         ]}
       >
-        <View style={styles.walletInfo}>
+        <TouchableOpacity
+          style={styles.walletInfo}
+          onPress={() => setSwitcherOpen(true)}
+          activeOpacity={0.7}
+        >
           <View style={styles.walletIcon}>
             <Text style={styles.walletIconText}>{avatar}</Text>
           </View>
-          <Text style={styles.walletName}>{activeWalletId ? 'My Wallet' : 'No Wallet'}</Text>
-        </View>
+          <Text style={styles.walletName}>
+            {activeWalletId ? parseWalletDisplayName(activeWalletId) : 'No Wallet'}
+          </Text>
+          <ChevronDown size={16} color={colors.textSecondary} style={{ marginLeft: 4 }} />
+        </TouchableOpacity>
 
         <View style={styles.headerActions}>
           <TouchableOpacity style={styles.settingsButton} onPress={handleSettingsPress}>
@@ -452,6 +481,8 @@ export default function WalletScreen() {
           <Text style={styles.actionButtonText}>Receive</Text>
         </TouchableOpacity>
       </View>
+
+      <WalletSwitcher isOpen={switcherOpen} onClose={() => setSwitcherOpen(false)} />
     </View>
   );
 }

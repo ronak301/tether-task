@@ -31,7 +31,7 @@ export default function CompleteScreen() {
       await restoreWallet(mnemonic, walletId);
 
       if (params.avatar) {
-        await setAvatar(params.avatar);
+        await setAvatar(params.avatar, walletId);
       }
 
       setWalletCreated(true);
