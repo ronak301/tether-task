@@ -5,38 +5,43 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '@/constants/colors';
+import { authenticateBiometric, getBiometricLabel } from '@/utils/biometric-auth';
 
 export default function AuthorizeScreen() {
   const insets = useSafeAreaInsets();
   const router = useDebouncedNavigation();
-  const { unlock, status } = useWalletManager();
+  const { unlock } = useWalletManager();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [biometricLabel, setBiometricLabel] = useState('Biometrics');
 
   useEffect(() => {
+    getBiometricLabel().then(setBiometricLabel);
     handleAuthorize();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Navigate to wallet once unlocked
-  useEffect(() => {
-    if (status === 'UNLOCKED') {
-      router.replace('/wallet');
-    }
-  }, [status, router]);
 
   const handleAuthorize = async () => {
     setIsLoading(true);
     setError(null);
     try {
+      // Gate the unlock behind biometric / device-passcode authentication.
+      const auth = await authenticateBiometric('Unlock your wallet');
+      if (!auth.success) {
+        setError(auth.error ?? 'Authentication failed');
+        return;
+      }
+
       await unlock();
+      router.replace('/wallet');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to unlock wallet';
-      setError(msg);
-      if (msg.includes('no wallet') || msg.includes('No wallet')) {
+      if (msg.toLowerCase().includes('no wallet')) {
         Alert.alert('Error', 'No wallet found');
         router.replace('/onboarding');
+        return;
       }
+      setError(msg);
     } finally {
       setIsLoading(false);
     }
@@ -64,7 +69,9 @@ export default function AuthorizeScreen() {
             disabled={isLoading}
           >
             <Fingerprint size={24} color={colors.white} />
-            <Text style={styles.primaryButtonText}>Use Biometric</Text>
+            <Text style={styles.primaryButtonText}>
+              {error ? 'Try Again' : `Unlock with ${biometricLabel}`}
+            </Text>
           </TouchableOpacity>
         )}
 

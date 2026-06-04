@@ -13,6 +13,7 @@ const wdkNetworkConfigs: WdkConfigs = {
         entrypointAddress: '0x0000000071727De22E5E9d8BAf0edAc6f37da032',
         transferMaxFee: 5000000,
         paymasterToken: { address: '0xdAC17F958D2ee523a2206206994597C13D831ec7' },
+        safeModulesVersion: '0.3.0',
       },
     },
     polygon: {
@@ -40,6 +41,7 @@ const wdkNetworkConfigs: WdkConfigs = {
         entrypointAddress: '0x0000000071727De22E5E9d8BAf0edAc6f37da032',
         transferMaxFee: 5000000,
         paymasterToken: { address: '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9' },
+        safeModulesVersion: '0.3.0',
       },
     },
     ton: {

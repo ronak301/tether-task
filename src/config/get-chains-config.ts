@@ -13,7 +13,8 @@ const getChainsConfig = () => {
       bridgeMaxFee: 5000000,
       paymasterToken: {
         address: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
-      }
+      },
+      safeModulesVersion: '0.3.0',
     },
     arbitrum: {
       chainId: 42161,
@@ -29,6 +30,7 @@ const getChainsConfig = () => {
       paymasterToken: {
         address: '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9',
       },
+      safeModulesVersion: '0.3.0',
     },
     polygon: {
       chainId: 137,

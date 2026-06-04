@@ -11,6 +11,7 @@ import 'react-native-reanimated';
 import wdkNetworkConfigs from '@/config/wdk-network-configs';
 import { Toaster } from 'sonner-native';
 import { colors } from '@/constants/colors';
+import { AppLockController } from '@/components/AppLockController';
 import { bundle } from '../../.wdk';
 
 SplashScreen.preventAutoHideAsync();
@@ -40,11 +41,15 @@ export default function RootLayout() {
         <WdkAppProvider
           bundle={{ bundle }}
           wdkConfigs={wdkNetworkConfigs}
-          enableAutoInitialization={true}
+          // Keep the wallet locked on launch so the biometric gate on
+          // /authorize runs before the wallet is loaded (auto-init would
+          // otherwise load it straight to READY and bypass the gate).
+          enableAutoInitialization={false}
           clearSensitiveDataOnBackground={true}
         >
           <NavigationThemeProvider value={CustomDarkTheme}>
             <View style={{ flex: 1, backgroundColor: colors.background }}>
+              <AppLockController />
               <Stack
                 screenOptions={{
                   headerShown: false,
