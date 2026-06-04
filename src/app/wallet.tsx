@@ -9,13 +9,11 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   ChevronDown,
-  Palette,
   QrCode,
   Settings,
-  Shield,
-  Star,
 } from 'lucide-react-native';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import {
   ActivityIndicator,
   Animated,
@@ -36,6 +34,8 @@ import formatAmount from '@/utils/format-amount';
 import formatUSDValue from '@/utils/format-usd-value';
 import useWalletAvatar from '@/hooks/use-wallet-avatar';
 import { useTransactions } from '@/hooks/use-transactions';
+import { TransactionItem } from '@tetherto/wdk-uikit-react-native';
+import type { Transaction as UITransaction } from '@tetherto/wdk-uikit-react-native';
 import { WalletSwitcher } from '@/components/WalletSwitcher';
 import { colors } from '@/constants/colors';
 
@@ -71,7 +71,7 @@ export default function WalletScreen() {
   const { mutateAsync: refreshBalance } = useRefreshBalance();
   const walletTransactions = useTransactions();
   const [refreshing, setRefreshing] = useState(false);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transactions, setTransactions] = useState<UITransaction[]>([]);
   const [mounted, setMounted] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const avatar = useWalletAvatar();
@@ -109,6 +109,15 @@ export default function WalletScreen() {
 
   const totalPortfolioValue = totalUSD;
 
+  // Refresh balances every time this screen comes into focus (e.g. returning
+  // from send screen) so the balance is always up-to-date after a transaction.
+  useFocusEffect(
+    useCallback(() => {
+      refreshBalance({ accountIndex: 0, type: 'wallet' }).catch(() => {});
+      refetchIndexer();
+    }, [refreshBalance, refetchIndexer])
+  );
+
   // Animated border opacity based on scroll position
   const borderOpacity = scrollY.interpolate({
     inputRange: [0, 50],
@@ -116,61 +125,32 @@ export default function WalletScreen() {
     extrapolate: 'clamp',
   });
 
-  const suggestions = [
-    {
-      id: 1,
-      icon: Star,
-      title: 'Star repo on GitHub',
-      color: colors.primary,
-      url: 'https://github.com/tetherto/wdk-starter-react-native',
-    },
-    {
-      id: 2,
-      icon: Shield,
-      title: 'Explore the WDK docs',
-      color: colors.primary,
-      url: 'https://docs.wallet.tether.io/',
-    },
-    {
-      id: 3,
-      icon: Palette,
-      title: 'Explore the WDK UI Kit',
-      color: colors.primary,
-      url: 'https://github.com/tetherto/wdk-uikit-react-native',
-    },
-  ];
 
-  // Build display transactions from indexer data
-  const getTransactions = async () => {
-    if (!walletTransactions.list.length) return [];
-
+  // Build latest 2 transactions from the indexer (USDT/XAUt transfers).
+  const getTransactions = async (): Promise<UITransaction[]> => {
     const walletAddresses = (addressData ?? []).map(a => a.address.toLowerCase());
 
-    const result = await Promise.all(
-      walletTransactions.list.slice(0, 3).map(async (tx, index) => {
-        const fromAddress = tx.from?.toLowerCase();
-        const isSent = walletAddresses.includes(fromAddress);
+    const items = await Promise.all(
+      walletTransactions.list.slice(0, 2).map(async (tx, i) => {
+        const isSent = walletAddresses.includes(tx.from?.toLowerCase());
         const amount = parseFloat(tx.amount);
         const config = assetConfig[tx.token];
-        const fiatAmount = await pricingService.getFiatValue(amount, tx.token as any, FiatCurrency.USD);
+        let fiatAmount = 0;
+        try { fiatAmount = await pricingService.getFiatValue(amount, tx.token as any, FiatCurrency.USD); } catch {}
 
         return {
-          id: index + 1,
-          type: isSent ? 'sent' : 'received',
-          asset: config?.name || tx.token.toUpperCase(),
-          token: tx.token,
+          id: `${tx.transactionHash}-${i}`,
+          type: (isSent ? 'sent' : 'received') as 'sent' | 'received',
+          token: config?.name ?? tx.token.toUpperCase(),
           amount: formatTokenAmount(amount, tx.token as any),
-          icon: isSent ? ArrowUpRight : ArrowDownLeft,
-          iconColor: isSent ? colors.danger : colors.success,
-          blockchain: tx.blockchain,
-          hash: tx.transactionHash,
-          fiatAmount,
-          currency: FiatCurrency.USD,
-        };
+          fiatAmount: formatUSDValue(fiatAmount, false),
+          fiatCurrency: FiatCurrency.USD,
+          network: tx.blockchain.charAt(0).toUpperCase() + tx.blockchain.slice(1),
+        } as UITransaction;
       })
     );
 
-    return result;
+    return items;
   };
 
   const handleSendPress = () => {
@@ -365,28 +345,6 @@ export default function WalletScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Suggestions */}
-        <View style={styles.suggestionsSection}>
-          <View style={styles.suggestionsHeader}>
-            <Text style={styles.sectionTitle}>Suggestions</Text>
-          </View>
-
-          <View style={styles.suggestionsGrid}>
-            {suggestions.map(suggestion => (
-              <TouchableOpacity
-                onPress={() => {
-                  Linking.openURL(suggestion.url);
-                }}
-                key={suggestion.id}
-                style={styles.suggestionCard}
-              >
-                <suggestion.icon size={24} color={suggestion.color} />
-                <Text style={styles.suggestionText}>{suggestion.title}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
         {/* Activity */}
         <View style={styles.activitySection}>
           <View
@@ -403,21 +361,7 @@ export default function WalletScreen() {
 
           {transactions.length > 0 ? (
             transactions.map(tx => (
-              <View key={tx.id} style={styles.transactionRow}>
-                <View style={styles.transactionIcon}>
-                  <tx.icon size={16} color={tx.iconColor} />
-                </View>
-                <View style={styles.transactionInfo}>
-                  <Text style={styles.transactionType}>{tx.asset}</Text>
-                  <Text style={styles.transactionSubtitle}>
-                    {tx.type === 'sent' ? 'Sent' : 'Received'} • {tx.blockchain}
-                  </Text>
-                </View>
-                <View style={styles.transactionAmount}>
-                  <Text style={styles.transactionAssetAmount}>{tx.amount}</Text>
-                  <Text style={styles.transactionUsdAmount}>{formatUSDValue(tx.fiatAmount)}</Text>
-                </View>
-              </View>
+              <TransactionItem key={tx.id} transaction={tx} />
             ))
           ) : (
             <View style={styles.noAssetsContainer}>

@@ -11,13 +11,13 @@ const wdkNetworkConfigs: WdkConfigs = {
         ? {
             chainId: 11155111,
             provider: 'https://ethereum-sepolia-rpc.publicnode.com',
-            bundlerUrl: `https://api.pimlico.io/v2/sepolia/rpc?apikey=${PIMLICO_KEY}`,
-            paymasterUrl: `https://api.pimlico.io/v2/sepolia/rpc?apikey=${PIMLICO_KEY}`,
-            paymasterAddress: '0x8b1f6cb5d062aa2ce8d581942bbb960420d875ba',
+            // Candide built abstractionkit (WDK's ERC-4337 engine) — their bundler
+            // is the most compatible for Safe UserOperation simulation on Sepolia.
+            bundlerUrl: 'https://api.candide.dev/public/v3/sepolia',
             entrypointAddress: '0x0000000071727De22E5E9d8BAf0edAc6f37da032',
             transferMaxFee: 5000000,
-            paymasterToken: { address: '0xaA8E23Fb1079EA71e0a56F48a2aA51851D8433D0' },
             safeModulesVersion: '0.3.0',
+            useNativeCoins: true,
           }
         : {
             chainId: 1,

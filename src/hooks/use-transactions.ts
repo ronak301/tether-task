@@ -1,27 +1,33 @@
 import { useAddresses } from '@tetherto/wdk-react-native-core';
 import { useEffect, useState, useCallback } from 'react';
 
-export type IndexerTransaction = {
+export type IndexerTransfer = {
   transactionHash: string;
   from: string;
   to: string;
   amount: string;
   token: string;
   blockchain: string;
-  timestamp: number;
+  timestamp: number; // milliseconds
+  blockNumber: number;
 };
 
-type IndexerResponse = {
-  list: IndexerTransaction[];
+type TransactionsResponse = {
+  list: IndexerTransfer[];
   isLoading: boolean;
+  refetch: () => void;
 };
 
 const INDEXER_BASE_URL = process.env.EXPO_PUBLIC_WDK_INDEXER_BASE_URL;
 const INDEXER_API_KEY = process.env.EXPO_PUBLIC_WDK_INDEXER_API_KEY;
+const INDEXER_CHAIN = process.env.EXPO_PUBLIC_CHAIN_ENV === 'sepolia' ? 'sepolia' : 'ethereum';
 
-export function useTransactions(): IndexerResponse {
+// Tokens the indexer supports for the current chain.
+const SUPPORTED_TOKENS = INDEXER_CHAIN === 'sepolia' ? ['usdt'] : ['usdt', 'xaut'];
+
+export function useTransactions(): TransactionsResponse {
   const { data: addresses } = useAddresses();
-  const [list, setList] = useState<IndexerTransaction[]>([]);
+  const [list, setList] = useState<IndexerTransfer[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   const fetchTransactions = useCallback(async () => {
@@ -29,29 +35,38 @@ export function useTransactions(): IndexerResponse {
 
     setIsLoading(true);
     try {
-      const headers = new Headers({
-        accept: 'application/json',
-        'x-api-key': INDEXER_API_KEY,
-        'Content-Type': 'application/json',
-      });
+      // Build one entry per (address × token) combination.
+      const payload = addresses.flatMap(a =>
+        SUPPORTED_TOKENS.map(token => ({
+          address: a.address,
+          blockchain: INDEXER_CHAIN,
+          token,
+        }))
+      );
 
-      // Build payload for each address
-      const payload = addresses.map(a => ({
-        address: a.address,
-        blockchain: a.network,
-      }));
-
-      const res = await fetch(`${INDEXER_BASE_URL}/v1/transactions`, {
+      const res = await fetch(`${INDEXER_BASE_URL}/api/v1/batch/token-transfers`, {
         method: 'POST',
-        headers,
-        body: JSON.stringify({ addresses: payload }),
+        headers: {
+          accept: 'application/json',
+          'Content-Type': 'application/json',
+          'x-api-key': INDEXER_API_KEY,
+        },
+        body: JSON.stringify(payload),
       });
 
-      if (!res.ok) return;
+      if (!res.ok) {
+        console.warn('[useTransactions] HTTP error:', res.status);
+        return;
+      }
 
-      const data = await res.json();
-      const txList: IndexerTransaction[] = (data?.transactions ?? data ?? []).flat();
-      setList(txList.sort((a, b) => b.timestamp - a.timestamp));
+      // Response: Array<{ transfers: IndexerTransfer[] }>
+      const data: Array<{ transfers: IndexerTransfer[] }> = await res.json();
+
+      const allTransfers = data
+        .flatMap(item => item.transfers ?? [])
+        .sort((a, b) => b.timestamp - a.timestamp);
+
+      setList(allTransfers);
     } catch (err) {
       console.warn('[useTransactions] fetch error:', err);
     } finally {
@@ -63,5 +78,5 @@ export function useTransactions(): IndexerResponse {
     fetchTransactions();
   }, [fetchTransactions]);
 
-  return { list, isLoading };
+  return { list, isLoading, refetch: fetchTransactions };
 }

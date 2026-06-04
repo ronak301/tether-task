@@ -1,4 +1,4 @@
-import { useAccount } from '@tetherto/wdk-react-native-core';
+import { useAccount, useRefreshBalance, useWalletManager } from '@tetherto/wdk-react-native-core';
 import { CryptoAddressInput } from '@tetherto/wdk-uikit-react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useDebouncedNavigation } from '@/hooks/use-debounced-navigation';
@@ -7,12 +7,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FiatCurrency, pricingService } from '@/services/pricing-service';
 import { useKeyboard } from '@/hooks/use-keyboard';
 import { colors } from '@/constants/colors';
-import { getAsset, toSmallestUnit, fromSmallestUnit } from '@/config/wdk-assets';
+import { getAsset, toSmallestUnit, fromSmallestUnit, ethAsset } from '@/config/wdk-assets';
+
+// With useNativeCoins: true the fee comes back in wei (ETH, 18 decimals).
+// With a paymasterToken it comes back in the token's smallest unit.
+const USE_NATIVE_COINS = process.env.EXPO_PUBLIC_CHAIN_ENV === 'sepolia';
 import type { GasFeeEstimate } from '@/utils/gas-fee-calculator';
 import {
   Alert,
   Keyboard,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   ScrollView,
@@ -59,6 +64,8 @@ export default function SendDetailsScreen() {
   // useAccount is per-network — networkId matches key in wdkConfigs
   const account = useAccount({ accountIndex: 0, network: networkId });
   const wdkAsset = getAsset(tokenId, networkId);
+  const { mutateAsync: refreshBalance } = useRefreshBalance();
+  const { activeWalletId } = useWalletManager();
 
   const [recipientAddress, setRecipientAddress] = useState('');
   const [amount, setAmount] = useState('');
@@ -136,14 +143,24 @@ export default function SendDetailsScreen() {
       try {
         const tokenAmount = amountValue ? getTokenAmount(amountValue) : 0;
         const smallestUnit = toSmallestUnit(tokenAmount || 0, wdkAsset);
+        // Skip estimation if no recipient — zero address causes bundler rejection.
+        const to = recipientAddress || '';
+        if (!to) {
+          setGasEstimate({ fee: undefined, error: undefined });
+          return;
+        }
+
         const feeResult = await account.estimateFee({
-          to: recipientAddress || '0x0000000000000000000000000000000000000000',
+          to,
           asset: wdkAsset,
           amount: smallestUnit,
         });
 
         if (feeResult.success && feeResult.fee) {
-          const feeDisplay = fromSmallestUnit(feeResult.fee, wdkAsset);
+          // When useNativeCoins: true the fee is in wei (ETH, 18 decimals).
+          // Otherwise it's in the paymaster token's smallest unit.
+          const feeAsset = USE_NATIVE_COINS ? ethAsset : wdkAsset;
+          const feeDisplay = fromSmallestUnit(feeResult.fee, feeAsset);
           setGasEstimate({ fee: feeDisplay, error: undefined });
         } else {
           setGasEstimate({ fee: undefined, error: feeResult.error ?? 'Could not estimate fee' });
@@ -360,6 +377,7 @@ export default function SendDetailsScreen() {
       if (result.success) {
         setTransactionResult({ txId: { fee: result.fee, hash: result.hash } });
         setShowConfirmation(true);
+        refreshBalance({ accountIndex: 0, type: 'wallet' }).catch(() => {});
       } else {
         throw new Error(result.error ?? 'Transaction failed');
       }
@@ -379,7 +397,7 @@ export default function SendDetailsScreen() {
 
   const balanceDisplay = useMemo(() => {
     if (inputMode === 'token') {
-      return `Balance: ${formatTokenAmount(parseFloat(tokenBalance), tokenSymbol as any)}`;
+      return `Balance: ${formatTokenAmount(parseFloat(tokenBalance.replace(/,/g, '')), tokenSymbol as any)}`;
     }
     return `Balance: ${formatUSDValue(parseFloat(tokenBalanceUSD))}`;
   }, [inputMode, tokenBalance, tokenBalanceUSD, tokenSymbol]);
@@ -389,8 +407,11 @@ export default function SendDetailsScreen() {
   ) => {
     const fee = transactionResult.txId?.fee;
     if (!fee || !wdkAsset) return formatTokenAmount(0, tokenSymbol as any);
-    const display = fromSmallestUnit(fee, wdkAsset);
-    return formatTokenAmount(display, tokenSymbol as any);
+    const feeAsset = USE_NATIVE_COINS ? ethAsset : wdkAsset;
+    const display = fromSmallestUnit(fee, feeAsset);
+    return USE_NATIVE_COINS
+      ? `${display.toFixed(6)} ETH`
+      : formatTokenAmount(display, tokenSymbol as any);
   };
 
   const getTransactionAmout = useCallback(() => {
@@ -401,8 +422,10 @@ export default function SendDetailsScreen() {
     return formatTokenAmount(parseFloat(amount || '0'), tokenSymbol as any);
   }, [inputMode, tokenPrice, amount, tokenSymbol]);
 
+  // Only disable "Use Max" for BTC (which needs amount for fee estimation).
+  // For EVM tokens, allow proceeding even without a fee estimate.
   const isUseMaxDisabled = useMemo(() => {
-    return tokenId.toLowerCase() !== 'btc' && gasEstimate.fee === undefined;
+    return tokenId.toLowerCase() === 'btc' && gasEstimate.fee === undefined;
   }, [tokenId, gasEstimate.fee]);
 
   return (
@@ -511,14 +534,15 @@ export default function SendDetailsScreen() {
                 ) : gasEstimate.fee !== undefined ? (
                   <>
                     <Text style={styles.gasAmount}>
-                      {formatTokenAmount(gasEstimate.fee, tokenSymbol as any)}
-                    </Text>
-                    <Text style={styles.gasUsd}>
-                      ≈ {formatUSDValue(gasEstimate.fee * tokenPrice)}
+                      {USE_NATIVE_COINS
+                        ? `${gasEstimate.fee.toFixed(6)} ETH`
+                        : formatTokenAmount(gasEstimate.fee, tokenSymbol as any)}
                     </Text>
                   </>
+                ) : !recipientAddress ? (
+                  <Text style={styles.gasAmount}>Enter recipient to estimate fee</Text>
                 ) : (
-                  <Text style={styles.gasAmount}>Loading fee estimate...</Text>
+                  <Text style={styles.gasAmount}>Tap refresh to estimate fee</Text>
                 )}
               </View>
             </ScrollView>
@@ -594,6 +618,20 @@ export default function SendDetailsScreen() {
               <Text style={styles.summaryLabel}>Network:</Text>
               <Text style={styles.summaryValue}>{networkName}</Text>
             </View>
+
+            {transactionResult?.txId?.hash && (
+              <TouchableOpacity
+                style={styles.explorerButton}
+                onPress={() => {
+                  const base = process.env.EXPO_PUBLIC_CHAIN_ENV === 'sepolia'
+                    ? 'https://sepolia.etherscan.io/tx/'
+                    : 'https://etherscan.io/tx/';
+                  Linking.openURL(base + transactionResult.txId!.hash);
+                }}
+              >
+                <Text style={styles.explorerButtonText}>View on Etherscan ↗</Text>
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity style={styles.modalButton} onPress={handleConfirmSend}>
               <Text style={styles.modalButtonText}>Close & Return to Main Screen</Text>
@@ -766,12 +804,25 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 4,
   },
+  explorerButton: {
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  explorerButtonText: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: '600',
+  },
   modalButton: {
     backgroundColor: colors.primary,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
-    marginTop: 32,
+    marginTop: 12,
   },
   modalButtonText: {
     color: colors.text,
