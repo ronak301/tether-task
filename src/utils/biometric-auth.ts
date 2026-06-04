@@ -25,6 +25,20 @@ export function isBiometricAuthInProgress(): boolean {
   return authInProgress;
 }
 
+// General lock-suppression flag for any native dialog (share sheet, camera
+// picker, etc.) that temporarily puts the app in background without the
+// user actually leaving the app. Call suppressLock(true) before opening
+// the dialog and suppressLock(false) after it resolves.
+let lockSuppressed = false;
+
+export function suppressLock(value: boolean): void {
+  lockSuppressed = value;
+}
+
+export function isLockSuppressed(): boolean {
+  return lockSuppressed;
+}
+
 /** True when the device has biometric hardware with at least one enrolled credential. */
 export async function isBiometricAvailable(): Promise<boolean> {
   try {

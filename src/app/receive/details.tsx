@@ -5,6 +5,7 @@ import * as Clipboard from 'expo-clipboard';
 import { ArrowLeft, Copy, Share, X } from 'lucide-react-native';
 import React, { useCallback } from 'react';
 import { Share as RNShare, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { suppressLock } from '@/utils/biometric-auth';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 import { colors } from '@/constants/colors';
@@ -41,12 +42,15 @@ export default function ReceiveQRCodeScreen() {
 
   const handleShareAddress = useCallback(async () => {
     try {
+      suppressLock(true);
       await RNShare.share({
         message: `${tokenName} Address (${networkName}): ${address}`,
         title: `${tokenName} Receive Address`,
       });
     } catch (error) {
       console.error('Error sharing address:', error);
+    } finally {
+      suppressLock(false);
     }
   }, [address, tokenName, networkName]);
 

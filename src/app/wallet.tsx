@@ -3,6 +3,7 @@ import { useWalletManager, useAddresses, useWdkApp, useRefreshBalance } from '@t
 import { Balance } from '@tetherto/wdk-uikit-react-native';
 import { useIndexerBalances } from '@/hooks/use-indexer-balances';
 import { useWalletBalances } from '@/hooks/use-wallet-balances';
+import { isLockSuppressed } from '@/utils/biometric-auth';
 import { useDebouncedNavigation } from '@/hooks/use-debounced-navigation';
 import {
   ArrowDownLeft,
@@ -89,9 +90,12 @@ export default function WalletScreen() {
     return walletId;
   };
 
-  // Redirect to authorization if wallet is locked
+  // Redirect to authorization if wallet is locked.
+  // Skip when a native dialog (share sheet, camera) has temporarily backgrounded
+  // the app — clearSensitiveDataOnBackground resets status to LOCKED in those
+  // cases too, but we don't want to force re-auth for that.
   useEffect(() => {
-    if (status === 'LOCKED') {
+    if (status === 'LOCKED' && !isLockSuppressed()) {
       router.replace('/authorize');
     }
   }, [status, router]);

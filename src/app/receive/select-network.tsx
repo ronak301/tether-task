@@ -5,7 +5,7 @@ import { NetworkType } from '@/types/wdk-types';
 import { useAddresses } from '@tetherto/wdk-react-native-core';
 import { useLocalSearchParams } from 'expo-router';
 import { useDebouncedNavigation } from '@/hooks/use-debounced-navigation';
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '@/constants/colors';
@@ -36,9 +36,7 @@ export default function ReceiveSelectNetworkScreen() {
   // Get available networks for the selected token
   const networks: NetworkOption[] = useMemo(() => {
     const tokenConfig = assetConfig[tokenId];
-    if (!tokenConfig) {
-      return [];
-    }
+    if (!tokenConfig) return [];
 
     return tokenConfig.supportedNetworks.map((networkType: NetworkType) => {
       const network = networkConfigs[networkType];
@@ -52,6 +50,25 @@ export default function ReceiveSelectNetworkScreen() {
       };
     });
   }, [tokenId, addressData, getAddressesForNetwork]);
+
+  // Auto-skip this screen when only one network is available with an address.
+  useEffect(() => {
+    const available = networks.filter(n => n.hasAddress);
+    if (available.length === 1) {
+      const n = available[0];
+      router.replace({
+        pathname: '/receive/details',
+        params: {
+          tokenId,
+          tokenSymbol,
+          tokenName,
+          networkId: n.id,
+          networkName: n.name,
+          address: n.address,
+        },
+      });
+    }
+  }, [networks, router, tokenId, tokenSymbol, tokenName]);
 
   const handleSelectNetwork = useCallback(
     (network: NetworkOption) => {

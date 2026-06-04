@@ -1,7 +1,7 @@
 import { usePathname, useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
-import { isBiometricAuthInProgress } from '@/utils/biometric-auth';
+import { isBiometricAuthInProgress, isLockSuppressed } from '@/utils/biometric-auth';
 
 // Screens that don't hold an unlocked session and must never be re-locked:
 // the lock screen itself, onboarding, and the wallet-setup flow.
@@ -43,8 +43,10 @@ export function AppLockController() {
       const leavingForeground = previous === 'active' && next === 'background';
       if (!leavingForeground) return;
 
-      // Ignore the transient "inactive" state caused by the auth prompt itself.
+      // Ignore transient background caused by biometric prompt or native dialogs
+      // (share sheet, camera picker, etc.) that briefly put the app in background.
       if (isBiometricAuthInProgress()) return;
+      if (isLockSuppressed()) return;
 
       // Only re-lock when the user is inside an authenticated screen.
       if (!isAuthenticatedRoute(pathnameRef.current)) return;
