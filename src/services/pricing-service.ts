@@ -1,6 +1,6 @@
 import { BitfinexPricingClient } from '@tetherto/wdk-pricing-bitfinex-http';
 import { PricingProvider } from '@tetherto/wdk-pricing-provider';
-import { AssetTicker } from '@tetherto/wdk-react-native-provider';
+import { AssetTicker } from '@/types/wdk-types';
 import DecimalJS from 'decimal.js';
 
 export enum FiatCurrency {

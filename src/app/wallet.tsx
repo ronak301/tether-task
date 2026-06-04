@@ -1,6 +1,7 @@
 import { BalanceLoader } from '@/components/BalanceLoader';
-import { AssetTicker, useWallet } from '@tetherto/wdk-react-native-provider';
+import { useWalletManager, useAddresses, useBalancesForWallet } from '@tetherto/wdk-react-native-core';
 import { Balance } from '@tetherto/wdk-uikit-react-native';
+import { allAssets, fromSmallestUnit } from '@/config/wdk-assets';
 import { useDebouncedNavigation } from '@/hooks/use-debounced-navigation';
 import {
   ArrowDownLeft,
@@ -31,6 +32,7 @@ import formatAmount from '@/utils/format-amount';
 import formatTokenAmount from '@/utils/format-token-amount';
 import formatUSDValue from '@/utils/format-usd-value';
 import useWalletAvatar from '@/hooks/use-wallet-avatar';
+import { useTransactions } from '@/hooks/use-transactions';
 import { colors } from '@/constants/colors';
 
 type AggregatedBalance = ({
@@ -57,15 +59,10 @@ type Transaction = {
 export default function WalletScreen() {
   const insets = useSafeAreaInsets();
   const router = useDebouncedNavigation();
-  const {
-    wallet,
-    isLoading,
-    isUnlocked,
-    refreshWalletBalance,
-    balances,
-    addresses,
-    transactions: walletTransactions,
-  } = useWallet();
+  const { activeWalletId, status, lock } = useWalletManager();
+  const { data: addressData } = useAddresses();
+  const { data: balanceResults, isLoading: isBalanceLoading } = useBalancesForWallet(0, allAssets);
+  const walletTransactions = useTransactions();
   const [refreshing, setRefreshing] = useState(false);
   const [aggregatedBalances, setAggregatedBalances] = useState<AggregatedBalance>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -73,52 +70,41 @@ export default function WalletScreen() {
   const avatar = useWalletAvatar();
   const scrollY = useRef(new Animated.Value(0)).current;
 
-  const hasWallet = !!wallet;
+  const hasWallet = !!activeWalletId;
+  const isLoading = isBalanceLoading;
 
-  // Redirect to authorization if wallet is not unlocked
+  // Redirect to authorization if wallet is locked
   useEffect(() => {
-    if (hasWallet && !isUnlocked) {
+    if (status === 'LOCKED') {
       router.replace('/authorize');
     }
-  }, [hasWallet, isUnlocked, router]);
+  }, [status, router]);
 
-  // Calculate aggregated balances by denomination
+  // Build aggregated balances from new balance results
   const getAggregatedBalances = async () => {
-    if (!balances) return [];
+    if (!balanceResults?.length) return [];
 
-    const map = new Map<string, { totalBalance: number }>();
+    // Sum by token ID across all networks
+    const map = new Map<string, number>();
+    for (const result of balanceResults) {
+      if (!result.success || !result.balance) continue;
+      const asset = allAssets.find(a => a.getId() === result.assetId && a.getNetwork() === result.network);
+      if (!asset) continue;
+      const display = fromSmallestUnit(result.balance, asset);
+      map.set(result.assetId, (map.get(result.assetId) ?? 0) + display);
+    }
 
-    // Sum up balances by denomination across all networks
-    balances.list.forEach(balance => {
-      const current = map.get(balance.denomination) || { totalBalance: 0 };
-      map.set(balance.denomination, {
-        totalBalance: current.totalBalance + parseFloat(balance.value),
-      });
-    });
-
-    const promises = Array.from(map.entries()).map(async ([denomination, { totalBalance }]) => {
-      const config = assetConfig[denomination];
+    const promises = Array.from(map.entries()).map(async ([tokenId, totalBalance]) => {
+      const config = assetConfig[tokenId];
       if (!config) return null;
-
-      // Calculate fiat value using pricing service
-      const fiatValue = await pricingService.getFiatValue(
-        totalBalance,
-        denomination as AssetTicker,
-        FiatCurrency.USD
-      );
-
-      return {
-        denomination,
-        balance: totalBalance,
-        usdValue: fiatValue,
-        config,
-      };
+      const fiatValue = await pricingService.getFiatValue(totalBalance, tokenId as any, FiatCurrency.USD);
+      return { denomination: tokenId, balance: totalBalance, usdValue: fiatValue, config };
     });
 
     return (await Promise.all(promises))
       .filter(Boolean)
-      .filter(asset => asset && asset.balance > 0) // Only show tokens with positive balance
-      .sort((a, b) => (b?.usdValue || 0) - (a?.usdValue || 0)); // Sort by USD value descending
+      .filter(a => a && a.balance > 0)
+      .sort((a, b) => (b?.usdValue ?? 0) - (a?.usdValue ?? 0));
   };
 
   // Calculate total portfolio value
@@ -157,46 +143,34 @@ export default function WalletScreen() {
     },
   ];
 
-  // Get real transactions from wallet data
+  // Build display transactions from indexer data
   const getTransactions = async () => {
-    if (!walletTransactions) return [];
+    if (!walletTransactions.list.length) return [];
 
-    // Get the wallet's own addresses for comparison
-    const walletAddresses = addresses
-      ? Object.values(addresses).map(addr => addr?.toLowerCase())
-      : [];
+    const walletAddresses = (addressData ?? []).map(a => a.address.toLowerCase());
 
     const result = await Promise.all(
-      walletTransactions.list
-        .sort((a, b) => b.timestamp - a.timestamp)
-        .slice(0, 3)
-        .map(async (tx, index) => {
-          const fromAddress = tx.from?.toLowerCase();
-          const isSent = walletAddresses.includes(fromAddress);
-          const amount = parseFloat(tx.amount);
-          const config = assetConfig[tx.token];
+      walletTransactions.list.slice(0, 3).map(async (tx, index) => {
+        const fromAddress = tx.from?.toLowerCase();
+        const isSent = walletAddresses.includes(fromAddress);
+        const amount = parseFloat(tx.amount);
+        const config = assetConfig[tx.token];
+        const fiatAmount = await pricingService.getFiatValue(amount, tx.token as any, FiatCurrency.USD);
 
-          // Calculate fiat amount using pricing service
-          const fiatAmount = await pricingService.getFiatValue(
-            amount,
-            tx.token as AssetTicker,
-            FiatCurrency.USD
-          );
-
-          return {
-            id: index + 1,
-            type: isSent ? 'sent' : 'received',
-            asset: config?.name || tx.token.toUpperCase(),
-            token: tx.token,
-            amount: `${formatTokenAmount(amount, tx.token as AssetTicker)}`,
-            icon: isSent ? ArrowUpRight : ArrowDownLeft,
-            iconColor: isSent ? colors.danger : colors.success,
-            blockchain: tx.blockchain,
-            hash: tx.transactionHash,
-            fiatAmount: fiatAmount,
-            currency: FiatCurrency.USD,
-          };
-        })
+        return {
+          id: index + 1,
+          type: isSent ? 'sent' : 'received',
+          asset: config?.name || tx.token.toUpperCase(),
+          token: tx.token,
+          amount: formatTokenAmount(amount, tx.token as any),
+          icon: isSent ? ArrowUpRight : ArrowDownLeft,
+          iconColor: isSent ? colors.danger : colors.success,
+          blockchain: tx.blockchain,
+          hash: tx.transactionHash,
+          fiatAmount,
+          currency: FiatCurrency.USD,
+        };
+      })
     );
 
     return result;
@@ -231,11 +205,9 @@ export default function WalletScreen() {
   };
 
   const handleRefresh = async () => {
-    if (!wallet) return;
-
     setRefreshing(true);
     try {
-      await refreshWalletBalance();
+      await getAggregatedBalances().then(setAggregatedBalances);
     } catch (error) {
       console.error('Failed to refresh wallet data:', error);
     } finally {
@@ -246,12 +218,12 @@ export default function WalletScreen() {
   useEffect(() => {
     getAggregatedBalances().then(setAggregatedBalances);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [balances]);
+  }, [balanceResults]);
 
   useEffect(() => {
     getTransactions().then(setTransactions);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [walletTransactions?.list, addresses]);
+  }, [walletTransactions.list, addressData]);
 
   // Force component to fully mount before enabling RefreshControl on iOS
   useEffect(() => {
@@ -279,7 +251,7 @@ export default function WalletScreen() {
           <View style={styles.walletIcon}>
             <Text style={styles.walletIconText}>{avatar}</Text>
           </View>
-          <Text style={styles.walletName}>{wallet?.name || 'No Wallet'}</Text>
+          <Text style={styles.walletName}>{activeWalletId ? 'My Wallet' : 'No Wallet'}</Text>
         </View>
 
         <View style={styles.headerActions}>
@@ -340,7 +312,7 @@ export default function WalletScreen() {
               isLoading={isLoading}
               Loader={BalanceLoader}
             />
-            {balances.isLoading ? (
+            {isBalanceLoading ? (
               <View style={{ top: 16, marginRight: 8 }}>
                 <ActivityIndicator size="small" color={colors.primary} />
               </View>
@@ -359,11 +331,11 @@ export default function WalletScreen() {
                   key={asset.denomination}
                   style={styles.assetRow}
                   onPress={() => {
-                    if (wallet) {
+                    if (activeWalletId) {
                       router.push({
                         pathname: '/token-details',
                         params: {
-                          walletId: wallet.id,
+                          walletId: activeWalletId,
                           token: asset.denomination.toUpperCase(),
                         },
                       });
@@ -380,7 +352,7 @@ export default function WalletScreen() {
                   </View>
                   <View style={styles.assetBalance}>
                     <Text style={styles.assetAmount}>
-                      {formatTokenAmount(asset.balance, asset.denomination as AssetTicker)}
+                      {formatTokenAmount(asset.balance, asset.denomination as any)}
                     </Text>
                     <Text style={styles.assetValue}>{formatAmount(asset.usdValue)} USD</Text>
                   </View>
@@ -431,6 +403,7 @@ export default function WalletScreen() {
                 <ActivityIndicator size="small" color={colors.primary} />
               </View>
             ) : null}
+
           </View>
 
           {transactions.length > 0 ? (

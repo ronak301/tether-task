@@ -1,8 +1,8 @@
 import { networkConfigs } from '@/config/networks';
+import { AssetTicker, NetworkType } from '@/types/wdk-types';
 import formatAmount from '@/utils/format-amount';
 import formatTokenAmount from '@/utils/format-token-amount';
 import formatUSDValue from '@/utils/format-usd-value';
-import { AssetTicker, NetworkType } from '@tetherto/wdk-react-native-provider';
 import { Send } from 'lucide-react-native';
 import React from 'react';
 import { Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';

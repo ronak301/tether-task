@@ -1,4 +1,4 @@
-import { AssetTicker, useWallet, WDKService } from '@tetherto/wdk-react-native-provider';
+import { useAccount } from '@tetherto/wdk-react-native-core';
 import { CryptoAddressInput } from '@tetherto/wdk-uikit-react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useDebouncedNavigation } from '@/hooks/use-debounced-navigation';
@@ -7,12 +7,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FiatCurrency, pricingService } from '@/services/pricing-service';
 import { useKeyboard } from '@/hooks/use-keyboard';
 import { colors } from '@/constants/colors';
-import {
-  getAssetTicker,
-  getNetworkType,
-  calculateGasFee,
-  type GasFeeEstimate,
-} from '@/utils/gas-fee-calculator';
+import { getAsset, toSmallestUnit, fromSmallestUnit } from '@/config/wdk-assets';
+import type { GasFeeEstimate } from '@/utils/gas-fee-calculator';
 import {
   Alert,
   Keyboard,
@@ -38,7 +34,6 @@ import { toast } from 'sonner-native';
 export default function SendDetailsScreen() {
   const insets = useSafeAreaInsets();
   const router = useDebouncedNavigation();
-  const { refreshWalletBalance } = useWallet();
   const params = useLocalSearchParams();
   const scrollViewRef = useRef<ScrollView>(null);
   const amountSectionYPosition = useRef<number>(0);
@@ -60,6 +55,10 @@ export default function SendDetailsScreen() {
     networkId: string;
     scannedAddress?: string;
   };
+
+  // useAccount is per-network — networkId matches key in wdkConfigs
+  const account = useAccount({ accountIndex: 0, network: networkId });
+  const wdkAsset = getAsset(tokenId, networkId);
 
   const [recipientAddress, setRecipientAddress] = useState('');
   const [amount, setAmount] = useState('');
@@ -104,18 +103,10 @@ export default function SendDetailsScreen() {
 
   // Calculate token price using pricing service
   useEffect(() => {
-    const calculateTokenPrice = async () => {
-      try {
-        const assetTicker = getAssetTicker(tokenId);
-        const price = await pricingService.getFiatValue(1, assetTicker, FiatCurrency.USD);
-        setTokenPrice(price);
-      } catch (error) {
-        console.error('Failed to get token price:', error);
-        setTokenPrice(0);
-      }
-    };
-
-    calculateTokenPrice();
+    pricingService
+      .getFiatValue(1, tokenId as any, FiatCurrency.USD)
+      .then(setTokenPrice)
+      .catch(() => setTokenPrice(0));
   }, [tokenId]);
 
   // Helper function to convert amount to token value based on input mode
@@ -130,23 +121,41 @@ export default function SendDetailsScreen() {
     [inputMode, tokenPrice]
   );
 
-  // Pre-calculate fee immediately when screen loads
+  // Estimate fee using the new useAccount hook
   const handleCalculateGasFee = useCallback(
     async (showLoading = true, amountValue?: string) => {
+      if (!wdkAsset) {
+        setGasEstimate({ fee: undefined, error: 'Asset not supported on this network' });
+        return;
+      }
       if (showLoading) {
         setIsLoadingGasEstimate(true);
         setGasEstimate(prev => ({ ...prev, error: undefined }));
       }
 
-      // Convert amount to token value if provided
-      const numericAmount = amountValue ? getTokenAmount(amountValue) : undefined;
+      try {
+        const tokenAmount = amountValue ? getTokenAmount(amountValue) : 0;
+        const smallestUnit = toSmallestUnit(tokenAmount || 0, wdkAsset);
+        const feeResult = await account.estimateFee({
+          to: recipientAddress || '0x0000000000000000000000000000000000000000',
+          asset: wdkAsset,
+          amount: smallestUnit,
+        });
 
-      const estimate = await calculateGasFee(networkId, tokenId, numericAmount);
-
-      setGasEstimate(estimate);
-      setIsLoadingGasEstimate(false);
+        if (feeResult.success && feeResult.fee) {
+          const feeDisplay = fromSmallestUnit(feeResult.fee, wdkAsset);
+          setGasEstimate({ fee: feeDisplay, error: undefined });
+        } else {
+          setGasEstimate({ fee: undefined, error: feeResult.error ?? 'Could not estimate fee' });
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Fee estimation failed';
+        setGasEstimate({ fee: undefined, error: msg });
+      } finally {
+        setIsLoadingGasEstimate(false);
+      }
     },
-    [networkId, tokenId, getTokenAmount]
+    [wdkAsset, account, recipientAddress, getTokenAmount]
   );
 
   // Pre-calculate fee when screen loads (skip for BTC as it requires amount)
@@ -165,24 +174,19 @@ export default function SendDetailsScreen() {
     }
   }, [amount, tokenId, handleCalculateGasFee]);
 
-  // Refetch token price and gas fee every 30 seconds
+  // Refresh price and fee estimate every 30 seconds
   useEffect(() => {
-    const interval = setInterval(async () => {
-      // Refetch token price
-      try {
-        const assetTicker = getAssetTicker(tokenId);
-        const price = await pricingService.getFiatValue(1, assetTicker, FiatCurrency.USD);
-        setTokenPrice(price);
-      } catch (error) {
-        console.error('Failed to refresh token price:', error);
-      }
+    const interval = setInterval(() => {
+      pricingService
+        .getFiatValue(1, tokenId as any, FiatCurrency.USD)
+        .then(setTokenPrice)
+        .catch(console.error);
 
-      // Refetch gas fee without showing loading state
       const isBtc = tokenId.toLowerCase() === 'btc';
       if (!isBtc || (isBtc && amount && parseFloat(amount) > 0)) {
         handleCalculateGasFee(false, amount);
       }
-    }, 30000); // 30 seconds
+    }, 30000);
 
     return () => clearInterval(interval);
   }, [tokenId, handleCalculateGasFee, amount]);
@@ -262,7 +266,7 @@ export default function SendDetailsScreen() {
       if (inputMode === 'token') {
         if (numericAmount > numericBalance) {
           setAmountError(
-            `Maximum: ${formatTokenAmount(numericBalance, tokenSymbol as AssetTicker)}`
+            `Maximum: ${formatTokenAmount(numericBalance, tokenSymbol as any)}`
           );
         } else {
           setAmountError(null);
@@ -331,7 +335,9 @@ export default function SendDetailsScreen() {
   }, [recipientAddress, amount, tokenBalance, inputMode]);
 
   const handleSend = useCallback(async () => {
-    if (!validateTransaction()) {
+    if (!validateTransaction()) return;
+    if (!wdkAsset) {
+      Alert.alert('Error', 'Asset not supported on this network');
       return;
     }
 
@@ -339,46 +345,32 @@ export default function SendDetailsScreen() {
     setTransactionResult(null);
 
     try {
-      const networkType = getNetworkType(networkId);
-      const assetTicker = getAssetTicker(tokenId);
-
-      // Convert fiat to token amount if in fiat mode
-      let numericAmount = parseFloat(amount);
+      let tokenAmount = parseFloat(amount);
       if (inputMode === 'fiat' && tokenPrice > 0) {
-        numericAmount = numericAmount / tokenPrice;
+        tokenAmount = tokenAmount / tokenPrice;
       }
 
-      const sendResult = await WDKService.sendByNetwork(
-        networkType,
-        0, // account index
-        numericAmount,
-        recipientAddress,
-        assetTicker
-      );
+      const smallestUnit = toSmallestUnit(tokenAmount, wdkAsset);
+      const result = await account.send({
+        to: recipientAddress,
+        asset: wdkAsset,
+        amount: smallestUnit,
+      });
 
-      setTransactionResult({ txId: sendResult });
-      setShowConfirmation(true);
+      if (result.success) {
+        setTransactionResult({ txId: { fee: result.fee, hash: result.hash } });
+        setShowConfirmation(true);
+      } else {
+        throw new Error(result.error ?? 'Transaction failed');
+      }
     } catch (error) {
-      console.error('Transaction failed:', error);
       const errorMessage = error instanceof Error ? error.message : 'Transaction failed';
-
       Alert.alert('Transaction Failed', errorMessage, [{ text: 'OK' }]);
-
       setTransactionResult({ error: errorMessage });
     } finally {
       setSendingTransaction(false);
-      refreshWalletBalance();
     }
-  }, [
-    validateTransaction,
-    amount,
-    recipientAddress,
-    networkId,
-    tokenId,
-    refreshWalletBalance,
-    inputMode,
-    tokenPrice,
-  ]);
+  }, [validateTransaction, wdkAsset, amount, recipientAddress, inputMode, tokenPrice, account]);
 
   const handleConfirmSend = useCallback(async () => {
     setShowConfirmation(false);
@@ -387,20 +379,18 @@ export default function SendDetailsScreen() {
 
   const balanceDisplay = useMemo(() => {
     if (inputMode === 'token') {
-      return `Balance: ${formatTokenAmount(parseFloat(tokenBalance), tokenSymbol as AssetTicker)}`;
+      return `Balance: ${formatTokenAmount(parseFloat(tokenBalance), tokenSymbol as any)}`;
     }
     return `Balance: ${formatUSDValue(parseFloat(tokenBalanceUSD))}`;
   }, [inputMode, tokenBalance, tokenBalanceUSD, tokenSymbol]);
 
   const getFeeFromTransactionResult = (
-    transactionResult: { txId?: { fee: string; hash: string } },
-    token: AssetTicker
+    transactionResult: { txId?: { fee: string; hash: string } }
   ) => {
     const fee = transactionResult.txId?.fee;
-    if (!fee) return formatTokenAmount(0, token);
-
-    const value = Number(fee) / WDKService.getDenominationValue(token);
-    return formatTokenAmount(value, token);
+    if (!fee || !wdkAsset) return formatTokenAmount(0, tokenSymbol as any);
+    const display = fromSmallestUnit(fee, wdkAsset);
+    return formatTokenAmount(display, tokenSymbol as any);
   };
 
   const getTransactionAmout = useCallback(() => {
@@ -408,8 +398,7 @@ export default function SendDetailsScreen() {
     if (inputMode === 'fiat' && tokenPrice > 0) {
       return formatUSDValue(numericAmount);
     }
-
-    return formatTokenAmount(parseFloat(amount || '0'), tokenSymbol as AssetTicker);
+    return formatTokenAmount(parseFloat(amount || '0'), tokenSymbol as any);
   }, [inputMode, tokenPrice, amount, tokenSymbol]);
 
   const isUseMaxDisabled = useMemo(() => {
@@ -522,7 +511,7 @@ export default function SendDetailsScreen() {
                 ) : gasEstimate.fee !== undefined ? (
                   <>
                     <Text style={styles.gasAmount}>
-                      {formatTokenAmount(gasEstimate.fee, tokenSymbol as AssetTicker)}
+                      {formatTokenAmount(gasEstimate.fee, tokenSymbol as any)}
                     </Text>
                     <Text style={styles.gasUsd}>
                       ≈ {formatUSDValue(gasEstimate.fee * tokenPrice)}
@@ -584,7 +573,7 @@ export default function SendDetailsScreen() {
               <View style={styles.transactionSummary}>
                 <Text style={styles.summaryLabel}>Fee:</Text>
                 <Text style={styles.summaryValue}>
-                  {getFeeFromTransactionResult(transactionResult, tokenSymbol as AssetTicker)}
+                  {getFeeFromTransactionResult(transactionResult)}
                 </Text>
               </View>
             )}

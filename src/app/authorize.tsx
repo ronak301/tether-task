@@ -1,17 +1,15 @@
-import { useWallet } from '@tetherto/wdk-react-native-provider';
+import { useWalletManager } from '@tetherto/wdk-react-native-core';
 import { useDebouncedNavigation } from '@/hooks/use-debounced-navigation';
 import { Fingerprint, Shield } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import parseWorkletError from '@/utils/parse-worklet-error';
 import { colors } from '@/constants/colors';
-import getErrorMessage from '@/utils/get-error-message';
 
 export default function AuthorizeScreen() {
   const insets = useSafeAreaInsets();
   const router = useDebouncedNavigation();
-  const { wallet, unlockWallet } = useWallet();
+  const { unlock, status } = useWalletManager();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,32 +18,28 @@ export default function AuthorizeScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleAuthorize = async () => {
-    if (!wallet) {
-      Alert.alert('Error', 'No wallet found');
-      router.replace('/onboarding');
-      return;
+  // Navigate to wallet once unlocked
+  useEffect(() => {
+    if (status === 'UNLOCKED') {
+      router.replace('/wallet');
     }
+  }, [status, router]);
 
+  const handleAuthorize = async () => {
     setIsLoading(true);
     setError(null);
-
     try {
-      const isDone = await unlockWallet();
-      if (isDone) {
-        router.replace('/wallet');
+      await unlock();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to unlock wallet';
+      setError(msg);
+      if (msg.includes('no wallet') || msg.includes('No wallet')) {
+        Alert.alert('Error', 'No wallet found');
+        router.replace('/onboarding');
       }
-    } catch (error) {
-      console.error('Failed to unlock wallet:', error);
-      setError(getErrorMessage(error, 'Failed to unlock wallet'));
-      return;
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleBiometricAuth = async () => {
-    handleAuthorize();
   };
 
   return (
@@ -61,19 +55,17 @@ export default function AuthorizeScreen() {
         {isLoading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.loadingText}>Initializing wallet...</Text>
+            <Text style={styles.loadingText}>Unlocking wallet...</Text>
           </View>
         ) : (
-          <>
-            <TouchableOpacity
-              style={styles.primaryButton}
-              onPress={handleBiometricAuth}
-              disabled={isLoading}
-            >
-              <Fingerprint size={24} color={colors.white} />
-              <Text style={styles.primaryButtonText}>Use Biometric</Text>
-            </TouchableOpacity>
-          </>
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={handleAuthorize}
+            disabled={isLoading}
+          >
+            <Fingerprint size={24} color={colors.white} />
+            <Text style={styles.primaryButtonText}>Use Biometric</Text>
+          </TouchableOpacity>
         )}
 
         {error && (
@@ -91,40 +83,13 @@ export default function AuthorizeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  content: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-  },
-  iconContainer: {
-    marginBottom: 40,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: colors.text,
-    marginBottom: 10,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: 50,
-  },
-  loadingContainer: {
-    alignItems: 'center',
-    marginTop: 50,
-  },
-  loadingText: {
-    color: colors.textSecondary,
-    marginTop: 16,
-    fontSize: 14,
-  },
+  container: { flex: 1, backgroundColor: colors.background },
+  content: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 },
+  iconContainer: { marginBottom: 40 },
+  title: { fontSize: 28, fontWeight: 'bold', color: colors.text, marginBottom: 10 },
+  subtitle: { fontSize: 16, color: colors.textSecondary, textAlign: 'center', marginBottom: 50 },
+  loadingContainer: { alignItems: 'center', marginTop: 50 },
+  loadingText: { color: colors.textSecondary, marginTop: 16, fontSize: 14 },
   primaryButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -136,30 +101,7 @@ const styles = StyleSheet.create({
     width: '100%',
     marginBottom: 16,
   },
-  primaryButtonText: {
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 12,
-  },
-  secondaryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.card,
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 12,
-    width: '100%',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  secondaryButtonText: {
-    color: colors.primary,
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 12,
-  },
+  primaryButtonText: { color: colors.text, fontSize: 16, fontWeight: '600', marginLeft: 12 },
   errorContainer: {
     marginTop: 20,
     padding: 12,
@@ -167,18 +109,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     width: '100%',
   },
-  errorText: {
-    color: colors.danger,
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  footer: {
-    paddingHorizontal: 40,
-    alignItems: 'center',
-  },
-  footerText: {
-    fontSize: 12,
-    color: colors.textTertiary,
-    textAlign: 'center',
-  },
+  errorText: { color: colors.danger, fontSize: 14, textAlign: 'center' },
+  footer: { paddingHorizontal: 40, alignItems: 'center' },
+  footerText: { fontSize: 12, color: colors.textTertiary, textAlign: 'center' },
 });

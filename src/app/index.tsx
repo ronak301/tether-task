@@ -1,4 +1,4 @@
-import { useWallet } from '@tetherto/wdk-react-native-provider';
+import { useWdkApp } from '@tetherto/wdk-react-native-core';
 import { Redirect } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
@@ -6,26 +6,17 @@ import { pricingService } from '../services/pricing-service';
 import { colors } from '@/constants/colors';
 
 export default function Index() {
-  const { wallet, isInitialized, isUnlocked } = useWallet();
+  const { state } = useWdkApp();
   const [isPricingReady, setIsPricingReady] = useState(false);
 
-  const initializePricing = async () => {
-    try {
-      await pricingService.initialize();
-      setIsPricingReady(true);
-    } catch (error) {
-      console.error('Failed to initialize pricing service:', error);
-      // Still set to true to allow app to continue even if pricing fails
-      setIsPricingReady(true);
-    }
-  };
-
   useEffect(() => {
-    initializePricing();
+    pricingService
+      .initialize()
+      .catch(console.error)
+      .finally(() => setIsPricingReady(true));
   }, []);
 
-  // Show loading indicator while WDK and pricing service are being initialized
-  if (!isInitialized || !isPricingReady) {
+  if (state.status === 'INITIALIZING' || !isPricingReady) {
     return (
       <View
         style={{
@@ -40,12 +31,17 @@ export default function Index() {
     );
   }
 
-  // Redirect based on wallet existence and unlock status
-  if (!wallet) {
-    return <Redirect href="/onboarding" />;
+  switch (state.status) {
+    case 'NO_WALLET':
+      return <Redirect href="/onboarding" />;
+    case 'LOCKED':
+      return <Redirect href="/authorize" />;
+    case 'READY':
+      return <Redirect href="/wallet" />;
+    case 'ERROR':
+      // On error fall through to onboarding so user can recover
+      return <Redirect href="/onboarding" />;
+    default:
+      return <Redirect href="/onboarding" />;
   }
-
-  // If wallet exists but is not unlocked, go to authorization
-  // If wallet is already unlocked (e.g., just created/imported), go directly to wallet
-  return <Redirect href={isUnlocked ? '/wallet' : '/authorize'} />;
 }

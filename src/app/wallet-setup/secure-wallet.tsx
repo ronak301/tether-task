@@ -1,55 +1,41 @@
 import { SeedPhrase } from '@/components/SeedPhrase';
-import { WDKService } from '@tetherto/wdk-react-native-provider';
+import { useWalletManager } from '@tetherto/wdk-react-native-core';
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams } from 'expo-router';
 import { useDebouncedNavigation } from '@/hooks/use-debounced-navigation';
 import { AlertCircle, ChevronLeft, Copy, Eye, EyeOff } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { getUniqueId } from 'react-native-device-info';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import parseWorkletError from '@/utils/parse-worklet-error';
 import { toast } from 'sonner-native';
 import { colors } from '@/constants/colors';
-import getErrorMessage from '@/utils/get-error-message';
 
 export default function SecureWalletScreen() {
   const router = useDebouncedNavigation();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{
-    walletName?: string;
-    avatar?: string;
-  }>();
+  const params = useLocalSearchParams<{ walletName?: string; avatar?: string }>();
+  const { generateMnemonic } = useWalletManager();
   const [mnemonic, setMnemonic] = useState<string[]>([]);
   const [showPhrase, setShowPhrase] = useState(true);
   const [isGenerating, setIsGenerating] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Generate mnemonic using WDK on mount
-    generateMnemonic();
+    generatePhrase();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const generateMnemonic = async () => {
+  const generatePhrase = async () => {
     try {
       setIsGenerating(true);
       setError(null);
-      const prf = await getUniqueId();
-      const mnemonicString = await WDKService.createSeed({ prf });
-
-      if (!mnemonicString) {
-        throw new Error('Received empty mnemonic');
-      }
-
+      const mnemonicString = await generateMnemonic(12);
       const words = mnemonicString.split(' ');
-      if (words.length !== 12) {
-        throw new Error(`Invalid mnemonic length: expected 12 words, got ${words.length}`);
-      }
-
+      if (words.length !== 12) throw new Error(`Expected 12 words, got ${words.length}`);
       setMnemonic(words);
-    } catch (error) {
-      console.error('Failed to generate seed phrase', error);
-      setError(getErrorMessage(error, 'Failed to generate seed phrase. Please try again.'));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to generate seed phrase';
+      setError(msg);
       setMnemonic([]);
     } finally {
       setIsGenerating(false);
@@ -57,17 +43,11 @@ export default function SecureWalletScreen() {
   };
 
   const handleCopyPhrase = async () => {
-    const phraseText = mnemonic.join(' ');
-    await Clipboard.setStringAsync(phraseText);
+    await Clipboard.setStringAsync(mnemonic.join(' '));
     toast.success('Secret phrase copied to clipboard');
   };
 
-  const handleToggleVisibility = () => {
-    setShowPhrase(!showPhrase);
-  };
-
   const handleNext = () => {
-    // Pass wallet data to next screen
     router.push({
       pathname: './confirm-phrase',
       params: {
@@ -98,8 +78,7 @@ export default function SecureWalletScreen() {
         <View style={styles.warningBox}>
           <AlertCircle size={20} color={colors.warning} />
           <Text style={styles.warningText}>
-            Never share your secret phrase with anyone! Anyone with this phrase can access your
-            wallet.
+            Never share your secret phrase with anyone! Anyone with this phrase can access your wallet.
           </Text>
         </View>
 
@@ -111,10 +90,12 @@ export default function SecureWalletScreen() {
             </View>
             <TouchableOpacity
               style={styles.retryButton}
-              onPress={generateMnemonic}
+              onPress={generatePhrase}
               disabled={isGenerating}
             >
-              <Text style={styles.retryButtonText}>{isGenerating ? 'Generating...' : 'Retry'}</Text>
+              <Text style={styles.retryButtonText}>
+                {isGenerating ? 'Generating...' : 'Retry'}
+              </Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -125,14 +106,15 @@ export default function SecureWalletScreen() {
               isLoading={isGenerating}
               hidden={!showPhrase}
             />
-
             <View style={styles.actionButtons}>
               <TouchableOpacity style={styles.actionButton} onPress={handleCopyPhrase}>
                 <Copy size={20} color={colors.primary} />
                 <Text style={styles.actionButtonText}>Copy Phrase</Text>
               </TouchableOpacity>
-
-              <TouchableOpacity style={styles.actionButton} onPress={handleToggleVisibility}>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => setShowPhrase(v => !v)}
+              >
                 <PhraseVisibilityIcon size={20} color={colors.primary} />
                 <Text style={styles.actionButtonText}>
                   {showPhrase ? 'Hide Phrase' : 'Show Phrase'}
@@ -164,134 +146,26 @@ export default function SecureWalletScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  backText: {
-    color: colors.primary,
-    fontSize: 16,
-    marginLeft: 4,
-  },
-  skipText: {
-    color: colors.primary,
-    fontSize: 16,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: colors.text,
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: colors.textSecondary,
-    marginBottom: 24,
-  },
-  warningBox: {
-    flexDirection: 'row',
-    backgroundColor: colors.warningBackground,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: colors.warningBorder,
-  },
-  warningText: {
-    flex: 1,
-    color: colors.warning,
-    fontSize: 14,
-    marginLeft: 12,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    marginHorizontal: -8,
-    marginBottom: 24,
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.tintedBackground,
-    borderRadius: 12,
-    paddingVertical: 14,
-    marginHorizontal: 8,
-    borderWidth: 1,
-    borderColor: colors.primary,
-  },
-  actionButtonText: {
-    color: colors.primary,
-    fontSize: 16,
-    fontWeight: '500',
-    marginLeft: 8,
-  },
-  footer: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
-  nextButton: {
-    backgroundColor: colors.primary,
-    height: 56,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  nextButtonDisabled: {
-    backgroundColor: colors.border,
-    opacity: 0.5,
-  },
-  nextButtonText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.black,
-  },
-  nextButtonTextDisabled: {
-    color: colors.textTertiary,
-  },
-  errorContainer: {
-    marginBottom: 24,
-  },
-  errorBox: {
-    flexDirection: 'row',
-    backgroundColor: colors.dangerBackground,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: colors.dangerBorder,
-  },
-  errorText: {
-    flex: 1,
-    color: colors.danger,
-    fontSize: 14,
-    marginLeft: 12,
-  },
-  retryButton: {
-    backgroundColor: colors.primary,
-    height: 48,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  retryButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.black,
-  },
+  container: { flex: 1, backgroundColor: colors.background },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16 },
+  backButton: { flexDirection: 'row', alignItems: 'center' },
+  backText: { color: colors.primary, fontSize: 16, marginLeft: 4 },
+  content: { flex: 1, paddingHorizontal: 20 },
+  title: { fontSize: 32, fontWeight: 'bold', color: colors.text, marginBottom: 8 },
+  subtitle: { fontSize: 16, color: colors.textSecondary, marginBottom: 24 },
+  warningBox: { flexDirection: 'row', backgroundColor: colors.warningBackground, borderRadius: 12, padding: 16, marginBottom: 24, borderWidth: 1, borderColor: colors.warningBorder },
+  warningText: { flex: 1, color: colors.warning, fontSize: 14, marginLeft: 12 },
+  actionButtons: { flexDirection: 'row', marginHorizontal: -8, marginBottom: 24 },
+  actionButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.tintedBackground, borderRadius: 12, paddingVertical: 14, marginHorizontal: 8, borderWidth: 1, borderColor: colors.primary },
+  actionButtonText: { color: colors.primary, fontSize: 16, fontWeight: '500', marginLeft: 8 },
+  footer: { paddingHorizontal: 20, paddingTop: 20 },
+  nextButton: { backgroundColor: colors.primary, height: 56, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  nextButtonDisabled: { backgroundColor: colors.border, opacity: 0.5 },
+  nextButtonText: { fontSize: 18, fontWeight: '600', color: colors.black },
+  nextButtonTextDisabled: { color: colors.textTertiary },
+  errorContainer: { marginBottom: 24 },
+  errorBox: { flexDirection: 'row', backgroundColor: colors.dangerBackground, borderRadius: 12, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: colors.dangerBorder },
+  errorText: { flex: 1, color: colors.danger, fontSize: 14, marginLeft: 12 },
+  retryButton: { backgroundColor: colors.primary, height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  retryButtonText: { fontSize: 16, fontWeight: '600', color: colors.black },
 });

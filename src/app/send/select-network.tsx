@@ -1,8 +1,10 @@
 import { Network, NetworkSelector } from '@/components/NetworkSelector';
 import { assetConfig } from '@/config/assets';
 import { networkConfigs } from '@/config/networks';
+import { useBalancesForWallet } from '@tetherto/wdk-react-native-core';
+import { AssetTicker, NetworkType } from '@/types/wdk-types';
+import { allAssets, fromSmallestUnit } from '@/config/wdk-assets';
 import formatAmount from '@/utils/format-amount';
-import { AssetTicker, useWallet } from '@tetherto/wdk-react-native-provider';
 import { useLocalSearchParams } from 'expo-router';
 import { useDebouncedNavigation } from '@/hooks/use-debounced-navigation';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -18,7 +20,7 @@ export default function SelectNetworkScreen() {
   const insets = useSafeAreaInsets();
   const router = useDebouncedNavigation();
   const params = useLocalSearchParams();
-  const { balances } = useWallet();
+  const { data: balanceResults } = useBalancesForWallet(0, allAssets);
   const { tokenId, tokenSymbol, tokenName, scannedAddress } = params as {
     tokenId: string;
     tokenSymbol: string;
@@ -28,32 +30,19 @@ export default function SelectNetworkScreen() {
 
   const [networks, setNetworks] = useState<Network[]>([]);
 
-  // Calculate networks with balances and fiat values
   useEffect(() => {
-    const calculateNetworks = async () => {
+    const buildNetworks = async () => {
       const tokenConfig = assetConfig[tokenId];
-
-      if (!tokenConfig) {
-        setNetworks([]);
-        return;
-      }
+      if (!tokenConfig) { setNetworks([]); return; }
 
       const networksWithBalances = await Promise.all(
-        tokenConfig.supportedNetworks.map(async networkType => {
+        tokenConfig.supportedNetworks.map(async (networkType: NetworkType) => {
           const network = networkConfigs[networkType];
-
-          const balance = balances.list?.find(
-            b => networkType === b.networkType && b.denomination === tokenId
-          );
-
-          const balanceValue = balance ? parseFloat(balance.value) : 0;
-
-          // Calculate fiat value using pricing service
-          const balanceUSD = await pricingService.getFiatValue(
-            balanceValue,
-            tokenId as AssetTicker,
-            FiatCurrency.USD
-          );
+          const result = balanceResults?.find(r => r.assetId === tokenId && r.network === networkType);
+          const asset = allAssets.find(a => a.getId() === tokenId && a.getNetwork() === networkType);
+          const balanceValue = result?.success && result.balance && asset
+            ? fromSmallestUnit(result.balance, asset) : 0;
+          const balanceUSD = await pricingService.getFiatValue(balanceValue, tokenId as AssetTicker, FiatCurrency.USD);
 
           return {
             ...network,
@@ -68,53 +57,36 @@ export default function SelectNetworkScreen() {
       setNetworks(networksWithBalances);
     };
 
-    calculateNetworks();
-  }, [tokenId, balances.list]);
+    buildNetworks();
+  }, [tokenId, balanceResults]);
 
-  const handleSelectNetwork = useCallback(
-    (network: Network) => {
-      router.push({
-        pathname: '/send/details',
-        params: {
-          tokenId,
-          tokenSymbol,
-          tokenName,
-          tokenBalance: network.balance,
-          tokenBalanceUSD: network.balanceFiat,
-          networkName: network.name,
-          networkId: network.id,
-          ...(scannedAddress && { scannedAddress }),
-        },
-      });
-    },
-    [router, tokenId, tokenSymbol, tokenName, scannedAddress]
-  );
+  const handleSelectNetwork = useCallback((network: Network) => {
+    router.push({
+      pathname: '/send/details',
+      params: {
+        tokenId,
+        tokenSymbol,
+        tokenName,
+        tokenBalance: network.balance,
+        tokenBalanceUSD: network.balanceFiat,
+        networkName: network.name,
+        networkId: network.id,
+        ...(scannedAddress && { scannedAddress }),
+      },
+    });
+  }, [router, tokenId, tokenSymbol, tokenName, scannedAddress]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <Header title="Select network" style={styles.header} />
-
-      <Text style={styles.description}>
-        Select the network you will be using to send {tokenSymbol || tokenName}
-      </Text>
-
+      <Text style={styles.description}>Select the network you will be using to send {tokenSymbol || tokenName}</Text>
       <NetworkSelector networks={networks} onSelectNetwork={handleSelectNetwork} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  header: {
-    marginBottom: 16,
-  },
-  description: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    paddingHorizontal: 20,
-    marginBottom: 24,
-  },
+  container: { flex: 1, backgroundColor: colors.background },
+  header: { marginBottom: 16 },
+  description: { fontSize: 14, color: colors.textSecondary, paddingHorizontal: 20, marginBottom: 24 },
 });

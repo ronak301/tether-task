@@ -1,7 +1,8 @@
 import Header from '@/components/header';
 import { assetConfig } from '@/config/assets';
 import { Network, networkConfigs } from '@/config/networks';
-import { NetworkType, useWallet } from '@tetherto/wdk-react-native-provider';
+import { NetworkType } from '@/types/wdk-types';
+import { useAddresses } from '@tetherto/wdk-react-native-core';
 import { useLocalSearchParams } from 'expo-router';
 import { useDebouncedNavigation } from '@/hooks/use-debounced-navigation';
 import React, { useCallback, useMemo } from 'react';
@@ -30,7 +31,7 @@ const NETWORK_DESCRIPTIONS = {
 export default function ReceiveSelectNetworkScreen() {
   const insets = useSafeAreaInsets();
   const router = useDebouncedNavigation();
-  const { addresses } = useWallet();
+  const { data: addressData, getAddressesForNetwork } = useAddresses();
   const params = useLocalSearchParams();
 
   const { tokenId, tokenSymbol, tokenName } = params as {
@@ -46,9 +47,10 @@ export default function ReceiveSelectNetworkScreen() {
       return [];
     }
 
-    return tokenConfig.supportedNetworks.map(networkType => {
+    return tokenConfig.supportedNetworks.map((networkType: NetworkType) => {
       const network = networkConfigs[networkType];
-      const address = addresses?.[network.id as NetworkType];
+      const addrs = getAddressesForNetwork(network.id);
+      const address = addrs[0]?.address;
       return {
         ...network,
         address,
@@ -56,7 +58,7 @@ export default function ReceiveSelectNetworkScreen() {
         description: NETWORK_DESCRIPTIONS[network.id as NetworkType],
       };
     });
-  }, [tokenId, addresses]);
+  }, [tokenId, addressData, getAddressesForNetwork]);
 
   const handleSelectNetwork = useCallback(
     (network: NetworkOption) => {

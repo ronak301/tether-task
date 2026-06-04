@@ -1,5 +1,5 @@
 import { FiatCurrency } from '@/services/pricing-service';
-import { NetworkType } from '@tetherto/wdk-react-native-provider';
+import { NetworkType } from '@/types/wdk-types';
 
 export interface AssetConfig {
   name: string;

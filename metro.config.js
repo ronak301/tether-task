@@ -1,6 +1,5 @@
 const { getDefaultConfig } = require('expo/metro-config');
 const path = require('path');
-const { configureMetroForWDK } = require('@tetherto/wdk-react-native-provider/metro-polyfills');
 
 const config = getDefaultConfig(__dirname);
 
@@ -15,32 +14,43 @@ config.resolver = {
   ...resolver,
   assetExts: resolver.assetExts.filter(ext => ext !== 'svg'),
   sourceExts: [...resolver.sourceExts, 'svg'],
-  // Ensure module paths include root node_modules
   nodeModulesPaths: [path.resolve(__dirname, 'node_modules')],
-  alias: {
-    '@': path.resolve(__dirname, 'src'),
+  // Node.js core module polyfills for React Native
+  extraNodeModules: {
+    stream: require.resolve('stream-browserify'),
+    http: require.resolve('stream-http'),
+    https: require.resolve('https-browserify'),
+    zlib: require.resolve('browserify-zlib'),
+    path: require.resolve('path-browserify'),
+    events: require.resolve('events'),
+    process: require.resolve('process/browser'),
+    querystring: require.resolve('querystring-es3'),
+    buffer: require.resolve('@craftzdog/react-native-buffer'),
+    crypto: require.resolve('react-native-crypto'),
   },
 };
 
-// Apply WDK polyfills configuration first (handles Node.js core module polyfills)
-const wdkConfig = configureMetroForWDK(config);
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  // Force all consumers to use root expo-crypto@15.x — prevents nested 55.x
+  // from being resolved (which would eagerly load the missing ExpoCryptoAES native module)
+  if (moduleName === 'expo-crypto') {
+    return context.resolveRequest(
+      { ...context, originModulePath: __filename },
+      moduleName,
+      platform
+    );
+  }
 
-// Now wrap the WDK's resolveRequest with our custom alias logic
-const wdkResolveRequest = wdkConfig.resolver.resolveRequest;
-
-wdkConfig.resolver.resolveRequest = (context, moduleName, platform) => {
   // Handle @/ alias
   if (moduleName.startsWith('@/')) {
     const resolvedPath = moduleName.replace('@/', path.resolve(__dirname, 'src') + '/');
     try {
       return context.resolveRequest(context, resolvedPath, platform);
-    } catch (e) {
-      // If the resolved path fails, fall through to WDK resolver
+    } catch (_) {
+      // fall through to default resolver
     }
   }
-
-  // Delegate to WDK's resolveRequest
-  return wdkResolveRequest(context, moduleName, platform);
+  return context.resolveRequest(context, moduleName, platform);
 };
 
-module.exports = wdkConfig;
+module.exports = config;

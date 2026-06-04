@@ -1,6 +1,8 @@
 import { assetConfig } from '@/config/assets';
+import { AssetTicker, NetworkType } from '@/types/wdk-types';
+import { useWalletManager, useBalancesForWallet, useAddresses } from '@tetherto/wdk-react-native-core';
+import { allAssets, fromSmallestUnit } from '@/config/wdk-assets';
 import formatAmount from '@/utils/format-amount';
-import { AssetTicker, NetworkType, useWallet } from '@tetherto/wdk-react-native-provider';
 import { useLocalSearchParams } from 'expo-router';
 import { useDebouncedNavigation } from '@/hooks/use-debounced-navigation';
 import React, { useEffect, useState } from 'react';
@@ -16,7 +18,9 @@ import { colors } from '@/constants/colors';
 export default function TokenDetailsScreen() {
   const router = useDebouncedNavigation();
   const insets = useSafeAreaInsets();
-  const { wallet, balances, addresses } = useWallet();
+  const { activeWalletId } = useWalletManager();
+  const { data: balanceResults, isLoading } = useBalancesForWallet(0, allAssets);
+  const { getAddressesForNetwork } = useAddresses();
   const params = useLocalSearchParams<{ walletId?: string; token?: string }>();
 
   const tokenSymbol = params.token?.toLowerCase() as keyof typeof assetConfig;
@@ -29,65 +33,32 @@ export default function TokenDetailsScreen() {
     color: string;
     totalBalance: number;
     totalUSDValue: number;
-    networkBalances: {
-      network: string;
-      balance: number;
-      usdValue: number;
-      address: string;
-    }[];
+    networkBalances: { network: string; balance: number; usdValue: number; address: string }[];
     priceUSD: number;
   } | null>(null);
 
-  // Calculate token balances from wallet data with async pricing
   useEffect(() => {
-    const calculateTokenData = async () => {
-      if (!balances.list || !tokenSymbol || !tokenConfig) {
-        setTokenData(null);
-        return;
-      }
+    const build = async () => {
+      if (!tokenSymbol || !tokenConfig || !balanceResults?.length) { setTokenData(null); return; }
 
-      // Filter balances for this specific token
-      const tokenBalances = balances.list.filter(balance => balance.denomination === tokenSymbol);
-
-      // Calculate total balance and network breakdown with fiat values
+      const relevant = balanceResults.filter(r => r.assetId === tokenSymbol && r.success && r.balance);
       let totalBalance = 0;
-      const networkBalancesPromises = tokenBalances.map(async balance => {
-        const amount = parseFloat(balance.value);
+
+      const networkBalancesPromises = relevant.map(async r => {
+        const asset = allAssets.find(a => a.getId() === r.assetId && a.getNetwork() === r.network);
+        const amount = asset ? fromSmallestUnit(r.balance!, asset) : 0;
         totalBalance += amount;
-
-        // Calculate fiat value using pricing service
-        const usdValue = await pricingService.getFiatValue(
-          amount,
-          tokenSymbol as AssetTicker,
-          FiatCurrency.USD
-        );
-
-        return {
-          network: balance.networkType,
-          balance: amount,
-          usdValue,
-          address: addresses?.[balance.networkType] || '',
-        };
+        const usdValue = await pricingService.getFiatValue(amount, tokenSymbol as AssetTicker, FiatCurrency.USD);
+        const addrs = getAddressesForNetwork(r.network);
+        return { network: r.network, balance: amount, usdValue, address: addrs[0]?.address ?? '' };
       });
 
-      const networkBalances = (await Promise.all(networkBalancesPromises)).filter(
-        item => item.balance > 0
-      );
-
-      const tokenPrice = await pricingService.getFiatValue(
-        1,
-        tokenSymbol as AssetTicker,
-        FiatCurrency.USD
-      );
-
-      const totalUSDValue = await pricingService.getFiatValue(
-        totalBalance,
-        tokenSymbol as AssetTicker,
-        FiatCurrency.USD
-      );
+      const networkBalances = (await Promise.all(networkBalancesPromises)).filter(nb => nb.balance > 0);
+      const tokenPrice = await pricingService.getFiatValue(1, tokenSymbol as AssetTicker, FiatCurrency.USD);
+      const totalUSDValue = await pricingService.getFiatValue(totalBalance, tokenSymbol as AssetTicker, FiatCurrency.USD);
 
       setTokenData({
-        symbol: getDisplaySymbol(tokenSymbol) as AssetTicker,
+        symbol: getDisplaySymbol(tokenSymbol),
         name: tokenConfig.name,
         icon: tokenConfig.icon,
         color: tokenConfig.color,
@@ -98,24 +69,17 @@ export default function TokenDetailsScreen() {
       });
     };
 
-    calculateTokenData();
-  }, [balances, tokenSymbol, tokenConfig, addresses]);
+    build();
+  }, [balanceResults, tokenSymbol, tokenConfig, getAddressesForNetwork]);
 
   const handleSendToken = (network?: NetworkType) => {
     if (!tokenData || !network) return;
-
-    // Find the specific network balance
     const networkBalance = tokenData.networkBalances.find(nb => nb.network === network);
     if (!networkBalance) return;
-
-    // Capitalize network name (e.g., "polygon" -> "Polygon")
-    const networkName = networkConfigs[network].name;
-
-    // Navigate to send details screen with all required params
     router.push({
       pathname: '/send/details',
       params: {
-        network: networkName,
+        networkName: networkConfigs[network].name,
         networkId: network,
         tokenBalance: networkBalance.balance.toString(),
         tokenBalanceUSD: `${formatAmount(networkBalance.usdValue)} USD`,
@@ -126,10 +90,10 @@ export default function TokenDetailsScreen() {
     });
   };
 
-  if (!params.walletId || !wallet) {
+  if (!activeWalletId) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        <Header isLoading={balances.isLoading} title="Token Details" />
+        <Header isLoading={isLoading} title="Token Details" />
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Wallet not found</Text>
         </View>
@@ -140,7 +104,7 @@ export default function TokenDetailsScreen() {
   if (!tokenData || !tokenConfig) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        <Header isLoading={balances.isLoading} title="Token Details" />
+        <Header isLoading={isLoading} title="Token Details" />
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Token not found or not supported</Text>
         </View>
@@ -150,24 +114,14 @@ export default function TokenDetailsScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <Header isLoading={balances.isLoading} title={`${tokenData.name} Details`} />
+      <Header isLoading={isLoading} title={`${tokenData.name} Details`} />
       <TokenDetails tokenData={tokenData} onSendPress={handleSendToken} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorText: {
-    color: colors.danger,
-    fontSize: 16,
-  },
+  container: { flex: 1, backgroundColor: colors.background },
+  errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  errorText: { color: colors.danger, fontSize: 16 },
 });
