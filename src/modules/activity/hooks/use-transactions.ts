@@ -36,8 +36,8 @@ export function useTransactions(): TransactionsResponse {
     setIsLoading(true);
     try {
       // Build one entry per (address × token) combination.
-      const payload = addresses.flatMap(a =>
-        SUPPORTED_TOKENS.map(token => ({
+      const payload = addresses.flatMap((a) =>
+        SUPPORTED_TOKENS.map((token) => ({
           address: a.address,
           blockchain: INDEXER_CHAIN,
           token,
@@ -63,7 +63,7 @@ export function useTransactions(): TransactionsResponse {
       const data: Array<{ transfers: IndexerTransfer[] }> = await res.json();
 
       const allTransfers = data
-        .flatMap(item => item.transfers ?? [])
+        .flatMap((item) => item.transfers ?? [])
         .sort((a, b) => b.timestamp - a.timestamp);
 
       setList(allTransfers);

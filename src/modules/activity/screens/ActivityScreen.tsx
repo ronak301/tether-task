@@ -17,7 +17,12 @@ const IS_SEPOLIA = process.env.EXPO_PUBLIC_CHAIN_ENV === 'sepolia';
 
 function formatTxDate(timestampMs: number): string {
   const d = new Date(timestampMs);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 export default function ActivityScreen() {
@@ -36,7 +41,7 @@ export default function ActivityScreen() {
 
   useEffect(() => {
     const transform = async () => {
-      const walletAddresses = (addressData ?? []).map(a => a.address.toLowerCase());
+      const walletAddresses = (addressData ?? []).map((a) => a.address.toLowerCase());
       const newHashMap: Record<string, string> = {};
 
       const result = await Promise.all(
@@ -46,7 +51,11 @@ export default function ActivityScreen() {
           const config = assetConfig[tx.token as keyof typeof assetConfig];
           let fiatAmount = 0;
           try {
-            fiatAmount = await pricingService.getFiatValue(amount, tx.token as AssetTicker, FiatCurrency.USD);
+            fiatAmount = await pricingService.getFiatValue(
+              amount,
+              tx.token as AssetTicker,
+              FiatCurrency.USD
+            );
           } catch {}
 
           const id = `${tx.transactionHash}-${index}`;
@@ -71,12 +80,15 @@ export default function ActivityScreen() {
     transform();
   }, [rawTxList, addressData]);
 
-  const handleTxPress = useCallback((tx: Transaction) => {
-    const hash = hashMap[tx.id];
-    if (!hash) return;
-    const base = IS_SEPOLIA ? 'https://sepolia.etherscan.io/tx/' : 'https://etherscan.io/tx/';
-    Linking.openURL(base + hash);
-  }, [hashMap]);
+  const handleTxPress = useCallback(
+    (tx: Transaction) => {
+      const hash = hashMap[tx.id];
+      if (!hash) return;
+      const base = IS_SEPOLIA ? 'https://sepolia.etherscan.io/tx/' : 'https://etherscan.io/tx/';
+      Linking.openURL(base + hash);
+    },
+    [hashMap]
+  );
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -89,7 +101,7 @@ export default function ActivityScreen() {
       <Header isLoading={isLoading} title="Activity" />
       <FlatList
         data={transactions}
-        keyExtractor={item => item.id}
+        keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
