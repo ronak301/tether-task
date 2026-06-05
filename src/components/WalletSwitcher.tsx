@@ -1,5 +1,5 @@
 import BottomSheet, { BottomSheetBackdrop, BottomSheetView } from '@gorhom/bottom-sheet';
-import { useWalletManager } from '@tetherto/wdk-react-native-core';
+import { useWalletManager, useRefreshBalance } from '@tetherto/wdk-react-native-core';
 import { getAvatar } from '@/config/avatar-options';
 import avatarOptions from '@/config/avatar-options';
 import { useRouter } from 'expo-router';
@@ -34,6 +34,7 @@ function parseWalletName(walletId: string): string {
 
 export function WalletSwitcher({ isOpen, onClose }: WalletSwitcherProps) {
   const { wallets, activeWalletId, setActiveWalletId, unlock } = useWalletManager();
+  const { mutateAsync: refreshBalance } = useRefreshBalance();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const bottomSheetRef = useRef<BottomSheet>(null);
@@ -67,15 +68,15 @@ export function WalletSwitcher({ isOpen, onClose }: WalletSwitcherProps) {
   const handleSelectWallet = useCallback(
     async (walletId: string) => {
       if (walletId !== activeWalletId) {
-        // setActiveWalletId alone doesn't initialize the worklet for the new wallet.
-        // unlock() loads the encryption key from keychain and initializes WDK —
-        // no biometric prompt since the user is already in an active session.
         setActiveWalletId(walletId);
         await unlock(walletId);
+        // Invalidate TanStack cache so ETH balance refetches from RPC
+        // instead of showing the previous wallet's stale initialData.
+        refreshBalance({ accountIndex: 0, type: 'wallet' }).catch(() => {});
       }
       onClose();
     },
-    [activeWalletId, setActiveWalletId, unlock, onClose]
+    [activeWalletId, setActiveWalletId, unlock, refreshBalance, onClose]
   );
 
   const handleAddWallet = useCallback(() => {

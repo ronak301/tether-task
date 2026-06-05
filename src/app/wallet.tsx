@@ -109,10 +109,11 @@ export default function WalletScreen() {
 
   const totalPortfolioValue = totalUSD;
 
-  // Refresh balances every time this screen comes into focus (e.g. returning
-  // from send screen) so the balance is always up-to-date after a transaction.
+  // Refresh prices + balances every time this screen comes into focus so
+  // USD values reflect the current ETH/XAUt market rate after a transaction.
   useFocusEffect(
     useCallback(() => {
+      pricingService.refreshExchangeRates().catch(() => {});
       refreshBalance({ accountIndex: 0, type: 'wallet' }).catch(() => {});
       refetchIndexer();
     }, [refreshBalance, refetchIndexer])
@@ -184,9 +185,8 @@ export default function WalletScreen() {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      // Invalidate the SDK's TanStack Query cache so useBalancesForWallet re-fetches
-      // fresh data from the RPC providers, then re-aggregate for display.
       await Promise.all([
+        pricingService.refreshExchangeRates(),
         refreshBalance({ accountIndex: 0, type: 'wallet' }),
         refetchIndexer(),
       ]);
@@ -348,7 +348,7 @@ export default function WalletScreen() {
         {/* Activity */}
         <View style={styles.activitySection}>
           <View
-            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}
           >
             <Text style={styles.sectionTitle}>Activity</Text>
             {walletTransactions.isLoading ? (

@@ -1,5 +1,5 @@
-import { useBalancesForWallet } from '@tetherto/wdk-react-native-core';
-import { useEffect, useState } from 'react';
+import { useBalancesForWallet, useWalletManager } from '@tetherto/wdk-react-native-core';
+import { useEffect, useRef, useState } from 'react';
 import { assetConfig } from '@/config/assets';
 import { ethAsset, fromSmallestUnit } from '@/config/wdk-assets';
 import { pricingService, FiatCurrency } from '@/services/pricing-service';
@@ -27,18 +27,45 @@ interface UseWalletBalancesResult {
 }
 
 export function useWalletBalances(): UseWalletBalancesResult {
+  const { activeWalletId } = useWalletManager();
   const { data: ethResults, isLoading: isEthLoading } = useBalancesForWallet(0, [ethAsset]);
   const { balances: indexerBalances, isLoading: isIndexerLoading } = useIndexerBalances();
   const [assets, setAssets] = useState<WalletAsset[]>([]);
+  // Shadow ethResults with wallet-scoped state so stale data from the previous
+  // wallet is never used when indexerBalances refreshes first after a switch.
+  const [activeEthResults, setActiveEthResults] = useState(ethResults);
+  // Skips the wallet-switch clear on first mount (no real switch happened).
+  const isMountedRef = useRef(false);
+  // True for the single React commit that includes a wallet switch, so the
+  // ethResults sync effect doesn't overwrite the fresh clear with stale initialData.
+  const justSwitchedRef = useRef(false);
 
   const isLoading = isEthLoading || isIndexerLoading;
+
+  useEffect(() => {
+    if (!isMountedRef.current) {
+      isMountedRef.current = true;
+      return; // first mount — no wallet switch, keep initialData
+    }
+    justSwitchedRef.current = true;
+    setAssets([]);
+    setActiveEthResults(undefined);
+  }, [activeWalletId]);
+
+  useEffect(() => {
+    if (justSwitchedRef.current) {
+      justSwitchedRef.current = false;
+      return; // keep the clear — ethResults still belongs to the previous wallet
+    }
+    setActiveEthResults(ethResults);
+  }, [ethResults]);
 
   useEffect(() => {
     async function build() {
       const map = new Map<string, number>();
 
       // ETH native from RPC
-      for (const result of ethResults ?? []) {
+      for (const result of activeEthResults ?? []) {
         if (!result.success || !result.balance) continue;
         const display = fromSmallestUnit(result.balance, ethAsset);
         if (display > 0) map.set('eth', (map.get('eth') ?? 0) + display);
@@ -82,7 +109,7 @@ export function useWalletBalances(): UseWalletBalancesResult {
     }
 
     build();
-  }, [ethResults, indexerBalances]);
+  }, [activeEthResults, indexerBalances]);
 
   const totalUSD = assets.reduce((sum, a) => sum + a.fiatValue, 0);
 

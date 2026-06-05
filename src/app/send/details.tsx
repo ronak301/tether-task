@@ -1,4 +1,4 @@
-import { useAccount, useRefreshBalance, useWalletManager } from '@tetherto/wdk-react-native-core';
+import { useAccount, useRefreshBalance } from '@tetherto/wdk-react-native-core';
 import { CryptoAddressInput } from '@tetherto/wdk-uikit-react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useDebouncedNavigation } from '@/hooks/use-debounced-navigation';
@@ -9,9 +9,6 @@ import { useKeyboard } from '@/hooks/use-keyboard';
 import { colors } from '@/constants/colors';
 import { getAsset, toSmallestUnit, fromSmallestUnit, ethAsset } from '@/config/wdk-assets';
 
-// With useNativeCoins: true the fee comes back in wei (ETH, 18 decimals).
-// With a paymasterToken it comes back in the token's smallest unit.
-const USE_NATIVE_COINS = process.env.EXPO_PUBLIC_CHAIN_ENV === 'sepolia';
 import type { GasFeeEstimate } from '@/utils/gas-fee-calculator';
 import {
   Alert,
@@ -35,6 +32,10 @@ import formatTokenAmount from '@/utils/format-token-amount';
 import formatUSDValue from '@/utils/format-usd-value';
 import Header from '@/components/header';
 import { toast } from 'sonner-native';
+
+// With useNativeCoins: true the fee comes back in wei (ETH, 18 decimals).
+// With a paymasterToken it comes back in the token's smallest unit.
+const USE_NATIVE_COINS = process.env.EXPO_PUBLIC_CHAIN_ENV === 'sepolia';
 
 export default function SendDetailsScreen() {
   const insets = useSafeAreaInsets();
@@ -65,7 +66,6 @@ export default function SendDetailsScreen() {
   const account = useAccount({ accountIndex: 0, network: networkId });
   const wdkAsset = getAsset(tokenId, networkId);
   const { mutateAsync: refreshBalance } = useRefreshBalance();
-  const { activeWalletId } = useWalletManager();
 
   const [recipientAddress, setRecipientAddress] = useState('');
   const [amount, setAmount] = useState('');
@@ -137,7 +137,7 @@ export default function SendDetailsScreen() {
       }
       if (showLoading) {
         setIsLoadingGasEstimate(true);
-        setGasEstimate(prev => ({ ...prev, error: undefined }));
+        setGasEstimate((prev) => ({ ...prev, error: undefined }));
       }
 
       try {
@@ -263,7 +263,7 @@ export default function SendDetailsScreen() {
   }, [inputMode, tokenBalance, tokenBalanceUSD, gasEstimate.fee, tokenPrice]);
 
   const toggleInputMode = useCallback(() => {
-    setInputMode(prev => (prev === 'token' ? 'fiat' : 'token'));
+    setInputMode((prev) => (prev === 'token' ? 'fiat' : 'token'));
     setAmount('');
     setAmountError(null);
   }, []);
@@ -282,9 +282,7 @@ export default function SendDetailsScreen() {
 
       if (inputMode === 'token') {
         if (numericAmount > numericBalance) {
-          setAmountError(
-            `Maximum: ${formatTokenAmount(numericBalance, tokenSymbol as any)}`
-          );
+          setAmountError(`Maximum: ${formatTokenAmount(numericBalance, tokenSymbol as any)}`);
         } else {
           setAmountError(null);
         }
@@ -402,9 +400,9 @@ export default function SendDetailsScreen() {
     return `Balance: ${formatUSDValue(parseFloat(tokenBalanceUSD))}`;
   }, [inputMode, tokenBalance, tokenBalanceUSD, tokenSymbol]);
 
-  const getFeeFromTransactionResult = (
-    transactionResult: { txId?: { fee: string; hash: string } }
-  ) => {
+  const getFeeFromTransactionResult = (transactionResult: {
+    txId?: { fee: string; hash: string };
+  }) => {
     const fee = transactionResult.txId?.fee;
     if (!fee || !wdkAsset) return formatTokenAmount(0, tokenSymbol as any);
     const feeAsset = USE_NATIVE_COINS ? ethAsset : wdkAsset;
@@ -623,9 +621,10 @@ export default function SendDetailsScreen() {
               <TouchableOpacity
                 style={styles.explorerButton}
                 onPress={() => {
-                  const base = process.env.EXPO_PUBLIC_CHAIN_ENV === 'sepolia'
-                    ? 'https://sepolia.etherscan.io/tx/'
-                    : 'https://etherscan.io/tx/';
+                  const base =
+                    process.env.EXPO_PUBLIC_CHAIN_ENV === 'sepolia'
+                      ? 'https://sepolia.etherscan.io/tx/'
+                      : 'https://etherscan.io/tx/';
                   Linking.openURL(base + transactionResult.txId!.hash);
                 }}
               >

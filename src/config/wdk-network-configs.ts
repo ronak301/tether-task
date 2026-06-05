@@ -10,7 +10,7 @@ const wdkNetworkConfigs: WdkConfigs = {
       config: IS_SEPOLIA
         ? {
             chainId: 11155111,
-            provider: 'https://ethereum-sepolia-rpc.publicnode.com',
+            provider: 'https://sepolia.drpc.org',
             // Candide built abstractionkit (WDK's ERC-4337 engine) — their bundler
             // is the most compatible for Safe UserOperation simulation on Sepolia.
             bundlerUrl: 'https://api.candide.dev/public/v3/sepolia',

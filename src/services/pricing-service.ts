@@ -30,7 +30,7 @@ class PricingService {
 
       this.provider = new PricingProvider({
         client,
-        priceCacheDurationMs: 1000 * 60 * 60, // 1 hour
+        priceCacheDurationMs: 1000 * 60 * 5, // 5 minutes
       });
 
       // Fetch and update exchange rate cache
@@ -59,7 +59,8 @@ class PricingService {
 
   async refreshExchangeRates(): Promise<void> {
     if (!this.provider) {
-      throw new Error('Pricing service not initialized');
+      await this.initialize();
+      return;
     }
 
     try {
