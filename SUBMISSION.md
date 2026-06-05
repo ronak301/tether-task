@@ -40,6 +40,40 @@ Understanding this boundary upfront was critical. The WDK is not a black box —
 
 **Navigation model** — used Expo Router's file-based routing with `router.replace` (not `push`) for auth transitions so the back stack never exposes the wallet screen behind the lock screen.
 
+### Folder Structure — Thought Process
+
+The starter kit ships with a flat structure (`components/`, `hooks/`, `utils/`) which works fine for a small codebase but doesn't scale — you end up with a `components/` folder that mixes wallet-specific UI with shared primitives, and there's no clear home for where screen logic lives.
+
+I extended it using a **module-based architecture** while keeping the starter kit's conventions intact:
+
+```
+src/
+├── app/              # Expo Router routes only — each file is a 1-line re-export
+├── modules/          # One folder per feature domain
+│   ├── wallet/       screens/ components/ hooks/ utils/
+│   ├── send/         screens/ utils/
+│   ├── receive/      screens/ constants/
+│   ├── activity/     screens/ hooks/
+│   ├── auth/         screens/ components/ utils/
+│   ├── settings/     screens/
+│   ├── onboarding/   screens/ components/
+│   └── wallet-setup/ screens/
+├── components/       # Shared UI used across 2+ modules
+├── hooks/            # Shared hooks used across 2+ modules
+├── services/         # External integrations (pricing)
+├── config/           # Static app-wide config
+├── constants/        # colors, etc.
+├── utils/            # Pure stateless functions
+└── types/            # Shared TypeScript types
+```
+
+**Key decisions:**
+
+- `app/` is purely Expo Router infrastructure — no business logic, no JSX, just re-exports. This means you can read the entire routing structure at a glance without wading through screen code.
+- Each module is self-contained — a new engineer working on `send/` only needs to look inside `modules/send/`. Screen logic, sub-components, and domain utils are co-located.
+- `components/`, `hooks/`, `services/` live parallel to modules and are strictly for code shared across two or more modules. Anything used by only one module lives inside that module.
+- The starter kit's flat structure is preserved for shared code — no deep nesting in shared folders, just flat files. The hierarchy only appears at the module level where it carries meaning.
+
 ### Breaking Down Requirements
 
 With the architecture clear, I mapped each requirement to the correct layer:
