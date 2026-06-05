@@ -8,6 +8,12 @@
 
 ---
 
+## Starting Point
+
+This submission is built on top of the **WDK starter kit** provided by Tether. The starter kit gave a bare Expo + React Native shell with the WDK packages pre-installed. Everything else — all screens, navigation flows, business logic, architecture, and UX — was built from scratch on top of it.
+
+---
+
 ## Platform
 
 **Android only.**
