@@ -1,8 +1,8 @@
 import { useWalletManager } from '@tetherto/wdk-react-native-core';
 import { useDebouncedNavigation } from '@/hooks/use-debounced-navigation';
 import { Fingerprint, Shield } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, AppState, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '@/constants/colors';
 import { authenticateBiometric, getBiometricLabel } from '@/utils/biometric-auth';
@@ -14,14 +14,9 @@ export default function AuthorizeScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [biometricLabel, setBiometricLabel] = useState('Biometrics');
+  const hasTriggeredRef = useRef(false);
 
-  useEffect(() => {
-    getBiometricLabel().then(setBiometricLabel);
-    handleAuthorize();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const handleAuthorize = async () => {
+  const handleAuthorize = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
@@ -45,7 +40,32 @@ export default function AuthorizeScreen() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [unlock, router]);
+
+  useEffect(() => {
+    getBiometricLabel().then(setBiometricLabel);
+
+    const triggerOnce = () => {
+      if (hasTriggeredRef.current) return;
+      hasTriggeredRef.current = true;
+      handleAuthorize();
+    };
+
+    // If the app is already active (e.g. user tapped the app icon manually),
+    // prompt right away. Otherwise wait until it comes to the foreground so
+    // the native auth dialog isn't invoked while the screen is still off.
+    if (AppState.currentState === 'active') {
+      triggerOnce();
+    } else {
+      const sub = AppState.addEventListener('change', next => {
+        if (next === 'active') {
+          sub.remove();
+          triggerOnce();
+        }
+      });
+      return () => sub.remove();
+    }
+  }, [handleAuthorize]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
