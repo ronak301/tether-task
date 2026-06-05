@@ -16,7 +16,7 @@ import { NetworkType } from '@/config/networks';
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useDebouncedNavigation();
-  const { activeWalletId, wallets, deleteWallet, setActiveWalletId, unlock, lock } = useWalletManager();
+  const { activeWalletId, wallets, deleteWallet, setActiveWalletId, unlock } = useWalletManager();
   const { data: addresses, isLoading: isAddressLoading, loadAddresses } = useAddresses();
   const avatar = useWalletAvatar();
 
@@ -156,15 +156,8 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {/* Danger Zone */}
+        {/* Delete Wallet */}
         <View style={styles.dangerSection}>
-          <View style={styles.sectionHeader}>
-            <Trash2 size={20} color={colors.danger} />
-            <Text style={[styles.sectionTitle, styles.dangerTitle]}>Danger Zone</Text>
-          </View>
-          <TouchableOpacity style={styles.lockButton} onPress={lock}>
-            <Text style={styles.lockButtonText}>Lock Wallet</Text>
-          </TouchableOpacity>
           <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteWallet}>
             <Trash2 size={20} color={colors.white} />
             <Text style={styles.deleteButtonText}>Delete Wallet</Text>
@@ -198,9 +191,6 @@ const styles = StyleSheet.create({
   networkLabel: { fontSize: 14, color: colors.textSecondary, marginBottom: 4 },
   addressValue: { fontSize: 13, color: colors.text, fontFamily: 'monospace' },
   dangerSection: { paddingHorizontal: 20, paddingTop: 32, paddingBottom: 40 },
-  dangerTitle: { color: colors.danger },
-  lockButton: { backgroundColor: colors.card, borderRadius: 12, paddingVertical: 16, alignItems: 'center', marginBottom: 12, borderWidth: 1, borderColor: colors.border },
-  lockButtonText: { color: colors.text, fontSize: 16, fontWeight: '600' },
   deleteButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.danger, borderRadius: 12, paddingVertical: 16, marginBottom: 12 },
   deleteButtonText: { color: colors.text, fontSize: 16, fontWeight: '600', marginLeft: 8 },
   warningText: { fontSize: 12, color: colors.textSecondary, textAlign: 'center', lineHeight: 18 },
