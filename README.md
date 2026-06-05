@@ -4,7 +4,7 @@ A non-custodial Ethereum wallet built on the WDK (Wallet Development Kit) starte
 
 ## Demo
 
-`assets/docs/demo.mov`
+<video src="assets/docs/demo.mp4" controls width="100%"></video>
 
 ---
 
