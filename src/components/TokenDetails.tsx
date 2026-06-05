@@ -1,5 +1,5 @@
 import { networkConfigs } from '@/config/networks';
-import { AssetTicker, NetworkType } from '@/types/wdk-types';
+import { AssetTicker, NetworkType } from '@/types/wdk';
 import formatAmount from '@/utils/format-amount';
 import formatTokenAmount from '@/utils/format-token-amount';
 import formatUSDValue from '@/utils/format-usd-value';

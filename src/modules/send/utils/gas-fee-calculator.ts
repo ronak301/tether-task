@@ -1,4 +1,4 @@
-import { AssetTicker, NetworkType } from '@/types/wdk-types';
+import { AssetTicker, NetworkType } from '@/types/wdk';
 
 export interface GasFeeEstimate {
   fee?: number;

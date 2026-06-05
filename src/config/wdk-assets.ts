@@ -38,13 +38,11 @@ export const xautAsset = new BaseAsset({
 });
 
 // XAUt is mainnet-only — no Sepolia deployment.
-export const allAssets = IS_SEPOLIA
-  ? [ethAsset, usdtAsset]
-  : [ethAsset, usdtAsset, xautAsset];
+export const allAssets = IS_SEPOLIA ? [ethAsset, usdtAsset] : [ethAsset, usdtAsset, xautAsset];
 
 export function getAsset(tokenId: string, network: string): BaseAsset | undefined {
   return allAssets.find(
-    a => a.getId() === tokenId.toLowerCase() && a.getNetwork() === network.toLowerCase()
+    (a) => a.getId() === tokenId.toLowerCase() && a.getNetwork() === network.toLowerCase()
   );
 }
 

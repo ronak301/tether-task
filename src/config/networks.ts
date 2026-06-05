@@ -1,4 +1,4 @@
-import { NetworkType } from '@/types/wdk-types';
+import { NetworkType } from '@/types/wdk';
 export { NetworkType };
 
 export interface Network {

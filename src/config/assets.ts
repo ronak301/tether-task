@@ -1,5 +1,5 @@
 import { FiatCurrency } from '@/services/pricing-service';
-import { NetworkType } from '@/types/wdk-types';
+import { NetworkType } from '@/types/wdk';
 
 export interface AssetConfig {
   name: string;

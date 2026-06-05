@@ -1,7 +1,7 @@
 import BottomSheet, { BottomSheetBackdrop, BottomSheetView } from '@gorhom/bottom-sheet';
 import { useWalletManager, useRefreshBalance } from '@tetherto/wdk-react-native-core';
-import { getAvatar } from '@/config/avatar-options';
-import avatarOptions from '@/config/avatar-options';
+import { getAvatar } from '@/modules/wallet/utils/avatar-options';
+import avatarOptions from '@/modules/wallet/utils/avatar-options';
 import { useRouter } from 'expo-router';
 import { Check, Plus } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -82,7 +82,7 @@ export function WalletSwitcher({ isOpen, onClose }: WalletSwitcherProps) {
   const handleAddWallet = useCallback(() => {
     onClose();
     // Small delay so the sheet has time to close before navigation.
-    setTimeout(() => router.push('/wallet-setup/name-wallet'), 300);
+    setTimeout(() => router.push({ pathname: '/onboarding', params: { mode: 'add' } }), 300);
   }, [onClose, router]);
 
   const renderBackdrop = useCallback(

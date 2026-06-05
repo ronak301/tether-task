@@ -1,7 +1,7 @@
 import { usePathname, useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
-import { isBiometricAuthInProgress, isLockSuppressed } from '@/utils/biometric-auth';
+import { isBiometricAuthInProgress, isLockSuppressed } from '@/modules/auth/utils/biometric-auth';
 
 // Screens that don't hold an unlocked session and must never be re-locked:
 // the lock screen itself, onboarding, and the wallet-setup flow.

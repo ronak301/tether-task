@@ -3,10 +3,10 @@ import { useEffect, useRef, useState } from 'react';
 import { assetConfig } from '@/config/assets';
 import { ethAsset, fromSmallestUnit } from '@/config/wdk-assets';
 import { pricingService, FiatCurrency } from '@/services/pricing-service';
-import { AssetTicker } from '@/types/wdk-types';
+import { AssetTicker } from '@/types/wdk';
 import formatTokenAmount from '@/utils/format-token-amount';
 import getDisplaySymbol from '@/utils/get-display-symbol';
-import { useIndexerBalances } from './use-indexer-balances';
+import { useIndexerBalances } from '@/hooks/use-indexer-balances';
 
 export interface WalletAsset {
   id: string;

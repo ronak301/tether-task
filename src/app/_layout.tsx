@@ -11,7 +11,7 @@ import 'react-native-reanimated';
 import wdkNetworkConfigs from '@/config/wdk-network-configs';
 import { Toaster } from 'sonner-native';
 import { colors } from '@/constants/colors';
-import { AppLockController } from '@/components/AppLockController';
+import { AppLockController } from '@/modules/auth/components/AppLockController';
 import { bundle } from '../../.wdk';
 
 SplashScreen.preventAutoHideAsync();

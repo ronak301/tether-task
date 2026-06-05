@@ -1,4 +1,4 @@
-import avatarOptions, { getAvatar } from '@/config/avatar-options';
+import avatarOptions, { getAvatar } from '@/modules/wallet/utils/avatar-options';
 import { useWalletManager } from '@tetherto/wdk-react-native-core';
 import { useEffect, useState } from 'react';
 

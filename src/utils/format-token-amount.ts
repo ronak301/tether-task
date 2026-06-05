@@ -1,4 +1,4 @@
-import { AssetTicker } from '@/types/wdk-types';
+import { AssetTicker } from '@/types/wdk';
 import formatAmount from './format-amount';
 import getDisplaySymbol from './get-display-symbol';
 

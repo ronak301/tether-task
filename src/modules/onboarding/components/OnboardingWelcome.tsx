@@ -23,7 +23,7 @@ export const OnBoardingWelcome: React.FC<Props> = ({ title, subtitle, actionButt
       <View style={styles.content}>
         <View style={styles.illustrationContainer}>
           <Image
-            source={require('../../../assets/images/wdk-logo.png')}
+            source={require('../../../../assets/images/wdk-logo.png')}
             style={styles.wdkLogo}
             resizeMode="contain"
           />
