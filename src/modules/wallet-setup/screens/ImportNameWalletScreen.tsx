@@ -19,7 +19,6 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { toast } from 'sonner-native';
 
 export default function ImportNameWalletScreen() {
   const router = useDebouncedNavigation();

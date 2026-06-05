@@ -12,12 +12,10 @@ import { useDebouncedNavigation } from '@/hooks/use-debounced-navigation';
 import { ArrowDownLeft, ArrowUpRight, ChevronDown, QrCode, Settings } from 'lucide-react-native';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
-import type { ImageSourcePropType } from 'react-native';
 import {
   ActivityIndicator,
   Animated,
   Image,
-  Linking,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -26,7 +24,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AssetConfig, assetConfig } from '@/config/assets';
+import { assetConfig } from '@/config/assets';
 import { FiatCurrency, pricingService } from '@/services/pricing-service';
 import { AssetTicker } from '@/types/wdk';
 import formatTokenAmount from '@/utils/format-token-amount';
@@ -39,26 +37,6 @@ import type { Transaction as UITransaction } from '@tetherto/wdk-uikit-react-nat
 import { WalletSwitcher } from '@/modules/wallet/components/WalletSwitcher';
 import { colors } from '@/constants/colors';
 
-type AggregatedBalance = ({
-  denomination: string;
-  balance: number;
-  usdValue: number;
-  config: AssetConfig;
-} | null)[];
-
-type Transaction = {
-  id: number;
-  type: string;
-  asset: string;
-  token: string;
-  amount: string;
-  icon: ImageSourcePropType;
-  iconColor: string;
-  blockchain: string;
-  hash: string;
-  fiatAmount: number;
-  currency: FiatCurrency;
-};
 
 export default function WalletScreen() {
   const insets = useSafeAreaInsets();

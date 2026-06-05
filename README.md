@@ -46,12 +46,6 @@ npm run test:e2e
 
 ---
 
-## Environment
-
-Keys are already set in `.env` for Sepolia testnet. No additional setup needed to run.
-
----
-
 ## Reference Docs
 
 - **[SUBMISSION.md](SUBMISSION.md)** — what's implemented, known callouts, platform notes
