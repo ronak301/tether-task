@@ -7,7 +7,7 @@ const useWalletAvatar = () => {
   const [avatar, setAvatar] = useState<string>(avatarOptions[0].emoji);
 
   useEffect(() => {
-    getAvatar(activeWalletId ?? undefined).then(a => setAvatar(a.emoji));
+    getAvatar(activeWalletId ?? undefined).then((a) => setAvatar(a.emoji));
   }, [activeWalletId]);
 
   return avatar;

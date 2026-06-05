@@ -27,7 +27,7 @@ function parseWalletName(walletId: string): string {
   if (match) {
     return match[1]
       .split('_')
-      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
       .join(' ');
   }
   return walletId;
@@ -53,9 +53,9 @@ export function WalletSwitcher({ isOpen, onClose }: WalletSwitcherProps) {
 
   // Load per-wallet avatars whenever the list changes.
   useEffect(() => {
-    const existing = wallets.filter(w => w.exists);
+    const existing = wallets.filter((w) => w.exists);
     Promise.all(
-      existing.map(async w => {
+      existing.map(async (w) => {
         const avatar = await getAvatar(w.identifier);
         return {
           id: w.identifier,
@@ -98,7 +98,7 @@ export function WalletSwitcher({ isOpen, onClose }: WalletSwitcherProps) {
     walletDisplayInfo.length > 0
       ? walletDisplayInfo
       : wallets
-          .filter(w => w.exists)
+          .filter((w) => w.exists)
           .map((w, i) => ({
             id: w.identifier,
             displayName: parseWalletName(w.identifier),
@@ -119,7 +119,7 @@ export function WalletSwitcher({ isOpen, onClose }: WalletSwitcherProps) {
       <BottomSheetView style={[styles.content, { paddingBottom: insets.bottom + 16 }]}>
         <Text style={styles.title}>My Wallets</Text>
 
-        {displayList.map(wallet => {
+        {displayList.map((wallet) => {
           const isActive = wallet.id === activeWalletId;
           return (
             <TouchableOpacity
@@ -131,7 +131,10 @@ export function WalletSwitcher({ isOpen, onClose }: WalletSwitcherProps) {
               <View style={[styles.avatarCircle, isActive && styles.avatarCircleActive]}>
                 <Text style={styles.avatarText}>{wallet.avatar}</Text>
               </View>
-              <Text style={[styles.walletName, isActive && styles.walletNameActive]} numberOfLines={1}>
+              <Text
+                style={[styles.walletName, isActive && styles.walletNameActive]}
+                numberOfLines={1}
+              >
                 {wallet.displayName}
               </Text>
               {isActive && <Check size={18} color={colors.primary} />}
@@ -164,7 +167,11 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     backgroundColor: colors.background,
   },
-  walletRowActive: { backgroundColor: 'rgba(255, 101, 1, 0.08)', borderWidth: 1, borderColor: colors.primary },
+  walletRowActive: {
+    backgroundColor: 'rgba(255, 101, 1, 0.08)',
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
   avatarCircle: {
     width: 40,
     height: 40,

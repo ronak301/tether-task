@@ -21,7 +21,7 @@ const storageKey = (walletId?: string) =>
 export const getAvatar = async (walletId?: string) => {
   const stored = await AsyncStorage.getItem(storageKey(walletId));
   if (stored) {
-    const found = avatarOptions.find(a => a.emoji === stored);
+    const found = avatarOptions.find((a) => a.emoji === stored);
     return found ?? avatarOptions[0];
   }
   return avatarOptions[0];

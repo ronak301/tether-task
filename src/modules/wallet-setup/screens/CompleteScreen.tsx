@@ -11,7 +11,7 @@ export default function CompleteScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ walletName: string; mnemonic: string; avatar?: string }>();
-  const { restoreWallet } = useWalletManager();
+  const { restoreWallet, unlock } = useWalletManager();
   const [walletCreated, setWalletCreated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -29,6 +29,7 @@ export default function CompleteScreen() {
       const walletId = `wallet_${walletName.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}`;
 
       await restoreWallet(mnemonic, walletId);
+      await unlock(walletId);
 
       if (params.avatar) {
         await setAvatar(params.avatar, walletId);
@@ -37,9 +38,11 @@ export default function CompleteScreen() {
       setWalletCreated(true);
     } catch (err) {
       console.error('Failed to create wallet:', err);
-      Alert.alert('Wallet Creation Failed', 'There was an issue creating your wallet. Please try again.', [
-        { text: 'Retry', onPress: createWallet },
-      ]);
+      Alert.alert(
+        'Wallet Creation Failed',
+        'There was an issue creating your wallet. Please try again.',
+        [{ text: 'Retry', onPress: createWallet }]
+      );
     } finally {
       setIsLoading(false);
     }
@@ -50,9 +53,7 @@ export default function CompleteScreen() {
       Alert.alert('Please Wait', 'Wallet is still being created...');
       return;
     }
-    navigation.dispatch(
-      CommonActions.reset({ index: 0, routes: [{ name: 'wallet' }] })
-    );
+    navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'wallet' }] }));
   };
 
   return (
@@ -75,7 +76,9 @@ export default function CompleteScreen() {
           onPress={handleGoToWallet}
           disabled={isLoading || !walletCreated}
         >
-          <Text style={[styles.buttonText, (isLoading || !walletCreated) && styles.buttonTextDisabled]}>
+          <Text
+            style={[styles.buttonText, (isLoading || !walletCreated) && styles.buttonTextDisabled]}
+          >
             {isLoading ? 'Creating Wallet...' : 'Go To Wallet'}
           </Text>
         </TouchableOpacity>
@@ -87,11 +90,23 @@ export default function CompleteScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { flex: 1, paddingHorizontal: 20, paddingTop: 60, alignItems: 'flex-start' },
-  title: { fontSize: 32, fontWeight: 'bold', color: colors.text, marginBottom: 16, alignSelf: 'stretch' },
+  title: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: 16,
+    alignSelf: 'stretch',
+  },
   subtitle: { fontSize: 16, color: colors.textSecondary, alignSelf: 'stretch' },
   loadingText: { color: colors.textSecondary, fontSize: 14, marginTop: 24 },
   footer: { paddingHorizontal: 20, paddingTop: 20 },
-  button: { backgroundColor: colors.primary, height: 56, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  button: {
+    backgroundColor: colors.primary,
+    height: 56,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   buttonDisabled: { backgroundColor: colors.card },
   buttonText: { fontSize: 18, fontWeight: '600', color: colors.black },
   buttonTextDisabled: { color: colors.textTertiary },

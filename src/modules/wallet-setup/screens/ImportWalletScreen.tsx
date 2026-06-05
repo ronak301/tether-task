@@ -1,7 +1,7 @@
 import { SeedPhrase } from '@/components/SeedPhrase';
 import * as Clipboard from 'expo-clipboard';
 import { useDebouncedNavigation } from '@/hooks/use-debounced-navigation';
-import { ChevronLeft, Download, FileText, Trash2 } from 'lucide-react-native';
+import { ChevronLeft, Download, FileText } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { colors } from '@/constants/colors';
 import {
@@ -14,9 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { validateMnemonic } from 'bip39';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { toast } from 'sonner-native';
 
 export default function ImportWalletScreen() {
   const router = useDebouncedNavigation();
@@ -34,41 +32,33 @@ export default function ImportWalletScreen() {
       const clipboardContent = await Clipboard.getStringAsync();
 
       if (!clipboardContent.trim()) {
-        toast.error('Empty Clipboard! No text found in clipboard');
+        Alert.alert('Empty Clipboard', 'No text found in clipboard', [{ text: 'OK' }]);
         return;
       }
 
       const words = clipboardContent.trim().split(/\s+/).slice(0, 12);
 
       if (words.length < 12) {
-        toast.error(
-          `Invalid Phrase! Found only ${words.length} words in clipboard. Please ensure you have exactly 12 words.`
+        Alert.alert(
+          'Invalid Phrase',
+          `Found only ${words.length} words. Please ensure you have exactly 12 words.`,
+          [{ text: 'OK' }]
         );
         return;
       }
 
       const newWords = [...secretWords];
       words.forEach((word, index) => {
-        if (index < 12) {
-          newWords[index] = word.toLowerCase().trim();
-        }
+        if (index < 12) newWords[index] = word.toLowerCase().trim();
       });
       setSecretWords(newWords);
-
-      toast.success('12 words have been pasted from clipboard');
     } catch (error) {
       console.error('Paste error:', error);
-      toast.error('Could not paste from clipboard');
+      Alert.alert('Error', 'Could not paste from clipboard', [{ text: 'OK' }]);
     }
   };
 
-  const handleClear = () => {
-    setSecretWords(Array(12).fill(''));
-  };
-
-  const isFormValid = () => {
-    return secretWords.every(word => word.trim().length > 0);
-  };
+  const isFormValid = () => secretWords.every((word) => word.trim().length > 0);
 
   const handleImportWallet = () => {
     if (!isFormValid()) {
@@ -78,16 +68,7 @@ export default function ImportWalletScreen() {
       return;
     }
 
-    const seedPhrase = secretWords.map(w => w.trim().toLowerCase()).join(' ');
-
-    if (!validateMnemonic(seedPhrase)) {
-      Alert.alert(
-        'Invalid Seed Phrase',
-        'The phrase you entered is not a valid BIP39 mnemonic. Please check each word is spelled correctly.',
-        [{ text: 'OK' }]
-      );
-      return;
-    }
+    const seedPhrase = secretWords.join(' ');
 
     router.push({
       pathname: './import-name-wallet',
@@ -118,11 +99,6 @@ export default function ImportWalletScreen() {
               <FileText size={20} color={colors.primary} />
               <Text style={styles.actionButtonText}>Paste</Text>
             </TouchableOpacity>
-
-            <TouchableOpacity style={styles.actionButton} onPress={handleClear}>
-              <Trash2 size={20} color={colors.primary} />
-              <Text style={styles.actionButtonText}>Clear</Text>
-            </TouchableOpacity>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -145,38 +121,13 @@ export default function ImportWalletScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  backText: {
-    color: colors.primary,
-    fontSize: 16,
-    marginLeft: 4,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: colors.text,
-    marginBottom: 32,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    marginHorizontal: -8,
-    marginBottom: 24,
-  },
+  container: { flex: 1, backgroundColor: colors.background },
+  header: { paddingHorizontal: 20, paddingVertical: 16 },
+  backButton: { flexDirection: 'row', alignItems: 'center' },
+  backText: { color: colors.primary, fontSize: 16, marginLeft: 4 },
+  content: { flex: 1, paddingHorizontal: 20 },
+  title: { fontSize: 32, fontWeight: 'bold', color: colors.text, marginBottom: 32 },
+  actionButtons: { flexDirection: 'row', marginHorizontal: -8, marginBottom: 24 },
   actionButton: {
     flex: 1,
     flexDirection: 'row',
@@ -189,16 +140,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.primary,
   },
-  actionButtonText: {
-    color: colors.primary,
-    fontSize: 16,
-    fontWeight: '500',
-    marginLeft: 8,
-  },
-  footer: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
+  actionButtonText: { color: colors.primary, fontSize: 16, fontWeight: '500', marginLeft: 8 },
+  footer: { paddingHorizontal: 20, paddingTop: 20 },
   importButton: {
     backgroundColor: colors.primary,
     height: 56,
@@ -208,15 +151,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
-  importButtonDisabled: {
-    backgroundColor: colors.card,
-  },
-  importButtonText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.black,
-  },
-  importButtonTextDisabled: {
-    color: colors.textTertiary,
-  },
+  importButtonDisabled: { backgroundColor: colors.card },
+  importButtonText: { fontSize: 18, fontWeight: '600', color: colors.black },
+  importButtonTextDisabled: { color: colors.textTertiary },
 });

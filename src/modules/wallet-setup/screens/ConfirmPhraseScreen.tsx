@@ -39,7 +39,7 @@ export default function ConfirmPhraseScreen() {
     }
     const positions = allIndices.slice(0, 3);
 
-    const verificationWords: WordPosition[] = positions.map(pos => {
+    const verificationWords: WordPosition[] = positions.map((pos) => {
       const correctWord = words[pos];
 
       // Pick 2 random BIP39 words that are not the correct word as distractors.
@@ -59,18 +59,18 @@ export default function ConfirmPhraseScreen() {
   }, [params.mnemonic]);
 
   const handleWordSelect = (position: number, word: string) => {
-    setSelectedWords(prev => ({
+    setSelectedWords((prev) => ({
       ...prev,
       [position]: word,
     }));
   };
 
   const isAllSelected = () => {
-    return wordPositions.every(wp => selectedWords[wp.position] !== undefined);
+    return wordPositions.every((wp) => selectedWords[wp.position] !== undefined);
   };
 
   const isCorrect = () => {
-    return wordPositions.every(wp => selectedWords[wp.position] === wp.word);
+    return wordPositions.every((wp) => selectedWords[wp.position] === wp.word);
   };
 
   const handleNext = () => {
@@ -87,7 +87,7 @@ export default function ConfirmPhraseScreen() {
       ]);
       // Reset selections for incorrect words
       const newSelections = { ...selectedWords };
-      wordPositions.forEach(wp => {
+      wordPositions.forEach((wp) => {
         if (selectedWords[wp.position] !== wp.word) {
           delete newSelections[wp.position];
         }
@@ -109,7 +109,7 @@ export default function ConfirmPhraseScreen() {
 
   const getButtonStyle = (position: number, word: string) => {
     const selected = selectedWords[position] === word;
-    const isCorrectWord = wordPositions.find(wp => wp.position === position)?.word === word;
+    const isCorrectWord = wordPositions.find((wp) => wp.position === position)?.word === word;
 
     if (selected) {
       if (isAllSelected() && !isCorrect() && !isCorrectWord) {
@@ -133,11 +133,11 @@ export default function ConfirmPhraseScreen() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>Confirm your secret phrase</Text>
 
-        {wordPositions.map(wp => (
+        {wordPositions.map((wp) => (
           <View key={wp.position} style={styles.wordSection}>
             <Text style={styles.wordLabel}>Word #{wp.position}</Text>
             <View style={styles.optionsContainer}>
-              {wp.options.map(option => (
+              {wp.options.map((option) => (
                 <TouchableOpacity
                   key={`${wp.position}-${option}`}
                   style={getButtonStyle(wp.position, option)}

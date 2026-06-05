@@ -26,10 +26,11 @@ export default function ImportNameWalletScreen() {
   const navigation = useNavigation();
   const params = useLocalSearchParams();
   const insets = useSafeAreaInsets();
-  const { restoreWallet } = useWalletManager();
+  const { restoreWallet, unlock } = useWalletManager();
   const [walletName, setWalletName] = useState('');
   const [selectedAvatar, setSelectedAvatar] = useState(avatarOptions[0]);
   const [isImporting, setIsImporting] = useState(false);
+  const [imported, setImported] = useState(false);
 
   // Get the seed phrase from navigation params
   const seedPhrase = params.seedPhrase ? decodeURIComponent(params.seedPhrase as string) : '';
@@ -45,21 +46,15 @@ export default function ImportNameWalletScreen() {
     try {
       const walletId = `wallet_${walletName.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}`;
       await restoreWallet(seedPhrase, walletId);
+      await unlock(walletId);
       await setAvatar(selectedAvatar.emoji, walletId);
 
-      toast.success('Your wallet has been imported successfully.');
-
-      navigation.dispatch(
-        CommonActions.reset({
-          index: 0,
-          routes: [{ name: 'wallet' }],
-        })
-      );
+      setImported(true);
     } catch (error: unknown) {
       console.error('Import wallet error:', error);
       Alert.alert(
         'Import Failed',
-        error instanceof Error ? error.message : 'Failed to import wallet. Please check your seed phrase and try again.',
+        'Failed to import wallet. Please check that each word in your seed phrase is spelled correctly.',
         [{ text: 'OK' }]
       );
     } finally {
@@ -67,7 +62,29 @@ export default function ImportNameWalletScreen() {
     }
   };
 
+  const handleGoToWallet = () => {
+    navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'wallet' }] }));
+  };
+
   const isNextDisabled = walletName.length === 0 || isImporting;
+
+  if (imported) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={styles.successContent}>
+          <Text style={styles.title}>Wallet Imported!</Text>
+          <Text style={styles.subtitle}>
+            Your wallet has been restored successfully. Tap below to start.
+          </Text>
+        </View>
+        <View style={[styles.footer, { paddingBottom: insets.bottom + 20 }]}>
+          <TouchableOpacity style={styles.nextButton} onPress={handleGoToWallet}>
+            <Text style={styles.nextButtonText}>Go To Wallet</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -104,7 +121,7 @@ export default function ImportNameWalletScreen() {
           <View style={styles.avatarSection}>
             <Text style={styles.sectionTitle}>Choose an avatar</Text>
             <View style={styles.avatarGrid}>
-              {avatarOptions.map(avatar => (
+              {avatarOptions.map((avatar) => (
                 <TouchableOpacity
                   key={avatar.id}
                   style={[
@@ -173,6 +190,11 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 20,
+  },
+  successContent: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 60,
   },
   title: {
     fontSize: 32,

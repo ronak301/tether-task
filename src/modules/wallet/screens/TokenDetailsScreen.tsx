@@ -1,6 +1,10 @@
 import { assetConfig } from '@/config/assets';
 import { AssetTicker, NetworkType } from '@/types/wdk';
-import { useWalletManager, useBalancesForWallet, useAddresses } from '@tetherto/wdk-react-native-core';
+import {
+  useWalletManager,
+  useBalancesForWallet,
+  useAddresses,
+} from '@tetherto/wdk-react-native-core';
 import { allAssets, fromSmallestUnit } from '@/config/wdk-assets';
 import formatAmount from '@/utils/format-amount';
 import { useLocalSearchParams } from 'expo-router';
@@ -40,23 +44,44 @@ export default function TokenDetailsScreen() {
 
   useEffect(() => {
     const build = async () => {
-      if (!tokenSymbol || !tokenConfig || !balanceResults?.length) { setTokenData(null); return; }
+      if (!tokenSymbol || !tokenConfig || !balanceResults?.length) {
+        setTokenData(null);
+        return;
+      }
 
-      const relevant = balanceResults.filter(r => r.assetId === tokenSymbol && r.success && r.balance);
+      const relevant = balanceResults.filter(
+        (r) => r.assetId === tokenSymbol && r.success && r.balance
+      );
       let totalBalance = 0;
 
-      const networkBalancesPromises = relevant.map(async r => {
-        const asset = allAssets.find(a => a.getId() === r.assetId && a.getNetwork() === r.network);
+      const networkBalancesPromises = relevant.map(async (r) => {
+        const asset = allAssets.find(
+          (a) => a.getId() === r.assetId && a.getNetwork() === r.network
+        );
         const amount = asset ? fromSmallestUnit(r.balance!, asset) : 0;
         totalBalance += amount;
-        const usdValue = await pricingService.getFiatValue(amount, tokenSymbol as AssetTicker, FiatCurrency.USD);
+        const usdValue = await pricingService.getFiatValue(
+          amount,
+          tokenSymbol as AssetTicker,
+          FiatCurrency.USD
+        );
         const addrs = getAddressesForNetwork(r.network);
         return { network: r.network, balance: amount, usdValue, address: addrs[0]?.address ?? '' };
       });
 
-      const networkBalances = (await Promise.all(networkBalancesPromises)).filter(nb => nb.balance > 0);
-      const tokenPrice = await pricingService.getFiatValue(1, tokenSymbol as AssetTicker, FiatCurrency.USD);
-      const totalUSDValue = await pricingService.getFiatValue(totalBalance, tokenSymbol as AssetTicker, FiatCurrency.USD);
+      const networkBalances = (await Promise.all(networkBalancesPromises)).filter(
+        (nb) => nb.balance > 0
+      );
+      const tokenPrice = await pricingService.getFiatValue(
+        1,
+        tokenSymbol as AssetTicker,
+        FiatCurrency.USD
+      );
+      const totalUSDValue = await pricingService.getFiatValue(
+        totalBalance,
+        tokenSymbol as AssetTicker,
+        FiatCurrency.USD
+      );
 
       setTokenData({
         symbol: getDisplaySymbol(tokenSymbol),
@@ -75,7 +100,7 @@ export default function TokenDetailsScreen() {
 
   const handleSendToken = (network?: NetworkType) => {
     if (!tokenData || !network) return;
-    const networkBalance = tokenData.networkBalances.find(nb => nb.network === network);
+    const networkBalance = tokenData.networkBalances.find((nb) => nb.network === network);
     if (!networkBalance) return;
     router.push({
       pathname: '/send/details',
