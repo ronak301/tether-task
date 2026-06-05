@@ -101,7 +101,7 @@ The AppState wait on mount fixes the bug where `authenticateAsync` was called wh
 **Handled correctly:**
 - Seed phrase and private keys stored in Keychain (iOS) / Keystore (Android) by WDK — app never holds raw key material
 - App locks on every background event — wallet content is never visible in the OS app switcher
-- BIP39 mnemonic validated before passing to WDK's `restoreWallet`
+- BIP39 mnemonic validation delegated to WDK's `restoreWallet` — WDK rejects invalid phrases with an error, keeping the app layer free of a redundant wordlist dependency
 - `suppressLock` wraps native share dialogs and camera to avoid false re-locks
 - `router.replace` on all auth transitions — wallet screen never reachable via back navigation
 
