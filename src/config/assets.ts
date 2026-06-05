@@ -1,10 +1,11 @@
 import { FiatCurrency } from '@/services/pricing-service';
 import { NetworkType } from '@/types/wdk';
+import type { ImageSourcePropType } from 'react-native';
 
 export interface AssetConfig {
   name: string;
   symbol: string;
-  icon: any;
+  icon: ImageSourcePropType;
   color: string;
   supportedNetworks: NetworkType[];
 }
@@ -16,7 +17,7 @@ export interface Asset {
   amount: string;
   fiatValue: number;
   fiatCurrency: FiatCurrency;
-  icon: string | any;
+  icon: ImageSourcePropType;
   color: string;
 }
 

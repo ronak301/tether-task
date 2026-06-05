@@ -55,11 +55,11 @@ export default function ImportNameWalletScreen() {
           routes: [{ name: 'wallet' }],
         })
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Import wallet error:', error);
       Alert.alert(
         'Import Failed',
-        error.message || 'Failed to import wallet. Please check your seed phrase and try again.',
+        error instanceof Error ? error.message : 'Failed to import wallet. Please check your seed phrase and try again.',
         [{ text: 'OK' }]
       );
     } finally {

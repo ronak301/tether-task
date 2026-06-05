@@ -1,4 +1,5 @@
 import BottomSheet, { BottomSheetBackdrop, BottomSheetView } from '@gorhom/bottom-sheet';
+import type { BottomSheetBackdropProps } from '@gorhom/bottom-sheet';
 import { useWalletManager, useRefreshBalance } from '@tetherto/wdk-react-native-core';
 import { getAvatar } from '@/modules/wallet/utils/avatar-options';
 import avatarOptions from '@/modules/wallet/utils/avatar-options';
@@ -86,7 +87,7 @@ export function WalletSwitcher({ isOpen, onClose }: WalletSwitcherProps) {
   }, [onClose, router]);
 
   const renderBackdrop = useCallback(
-    (props: any) => (
+    (props: BottomSheetBackdropProps) => (
       <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} opacity={0.5} />
     ),
     []

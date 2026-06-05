@@ -1,5 +1,6 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Clipboard from 'expo-clipboard';
+import type { Href } from 'expo-router';
 import { useLocalSearchParams } from 'expo-router';
 import { useDebouncedNavigation } from '@/hooks/use-debounced-navigation';
 import { suppressLock } from '@/modules/auth/utils/biometric-auth';
@@ -38,11 +39,12 @@ export default function ScanQRScreen() {
 
   const navigateWithAddress = useCallback(
     (address: string) => {
-      const target = returnRoute ?? '/send/select-token';
+      const raw = Array.isArray(returnRoute) ? returnRoute[0] : returnRoute;
+      const target = raw ?? '/send/select-token';
       router.replace({
-        pathname: target as any,
+        pathname: target,
         params: { scannedAddress: address.trim(), ...params },
-      });
+      } as Href);
     },
     [router, returnRoute, params]
   );

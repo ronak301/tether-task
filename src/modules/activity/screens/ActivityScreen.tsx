@@ -6,6 +6,7 @@ import { FlatList, Linking, RefreshControl, StyleSheet, Text, View } from 'react
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { assetConfig } from '@/config/assets';
 import { FiatCurrency, pricingService } from '@/services/pricing-service';
+import { AssetTicker } from '@/types/wdk';
 import formatTokenAmount from '@/utils/format-token-amount';
 import formatUSDValue from '@/utils/format-usd-value';
 import Header from '@/components/Header';
@@ -45,7 +46,7 @@ export default function ActivityScreen() {
           const config = assetConfig[tx.token as keyof typeof assetConfig];
           let fiatAmount = 0;
           try {
-            fiatAmount = await pricingService.getFiatValue(amount, tx.token as any, FiatCurrency.USD);
+            fiatAmount = await pricingService.getFiatValue(amount, tx.token as AssetTicker, FiatCurrency.USD);
           } catch {}
 
           const id = `${tx.transactionHash}-${index}`;
@@ -55,7 +56,7 @@ export default function ActivityScreen() {
             id,
             type: isSent ? ('sent' as const) : ('received' as const),
             token: config?.name ?? tx.token.toUpperCase(),
-            amount: formatTokenAmount(amount, tx.token as any),
+            amount: formatTokenAmount(amount, tx.token as AssetTicker),
             fiatAmount: formatUSDValue(fiatAmount, false),
             fiatCurrency: FiatCurrency.USD,
             network: `${tx.blockchain.charAt(0).toUpperCase() + tx.blockchain.slice(1)} • ${formatTxDate(tx.timestamp)}`,

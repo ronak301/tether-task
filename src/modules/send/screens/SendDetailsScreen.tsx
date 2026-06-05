@@ -10,6 +10,7 @@ import { colors } from '@/constants/colors';
 import { getAsset, toSmallestUnit, fromSmallestUnit, ethAsset } from '@/config/wdk-assets';
 
 import type { GasFeeEstimate } from '@/modules/send/utils/gas-fee-calculator';
+import type { LayoutChangeEvent } from 'react-native';
 import {
   Alert,
   Keyboard,
@@ -27,6 +28,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
+import { AssetTicker } from '@/types/wdk';
 import getDisplaySymbol from '@/utils/get-display-symbol';
 import formatTokenAmount from '@/utils/format-token-amount';
 import formatUSDValue from '@/utils/format-usd-value';
@@ -111,7 +113,7 @@ export default function SendDetailsScreen() {
   // Calculate token price using pricing service
   useEffect(() => {
     pricingService
-      .getFiatValue(1, tokenId as any, FiatCurrency.USD)
+      .getFiatValue(1, tokenId as AssetTicker, FiatCurrency.USD)
       .then(setTokenPrice)
       .catch(() => setTokenPrice(0));
   }, [tokenId]);
@@ -195,7 +197,7 @@ export default function SendDetailsScreen() {
   useEffect(() => {
     const interval = setInterval(() => {
       pricingService
-        .getFiatValue(1, tokenId as any, FiatCurrency.USD)
+        .getFiatValue(1, tokenId as AssetTicker, FiatCurrency.USD)
         .then(setTokenPrice)
         .catch(console.error);
 
@@ -282,7 +284,7 @@ export default function SendDetailsScreen() {
 
       if (inputMode === 'token') {
         if (numericAmount > numericBalance) {
-          setAmountError(`Maximum: ${formatTokenAmount(numericBalance, tokenSymbol as any)}`);
+          setAmountError(`Maximum: ${formatTokenAmount(numericBalance, tokenSymbol as AssetTicker)}`);
         } else {
           setAmountError(null);
         }
@@ -323,7 +325,7 @@ export default function SendDetailsScreen() {
     setIsAmountInputFocused(false);
   }, []);
 
-  const handleAmountSectionLayout = useCallback((event: any) => {
+  const handleAmountSectionLayout = useCallback((event: LayoutChangeEvent) => {
     amountSectionYPosition.current = event.nativeEvent.layout.y;
   }, []);
 
@@ -395,7 +397,7 @@ export default function SendDetailsScreen() {
 
   const balanceDisplay = useMemo(() => {
     if (inputMode === 'token') {
-      return `Balance: ${formatTokenAmount(parseFloat(tokenBalance.replace(/,/g, '')), tokenSymbol as any)}`;
+      return `Balance: ${formatTokenAmount(parseFloat(tokenBalance.replace(/,/g, '')), tokenSymbol as AssetTicker)}`;
     }
     return `Balance: ${formatUSDValue(parseFloat(tokenBalanceUSD))}`;
   }, [inputMode, tokenBalance, tokenBalanceUSD, tokenSymbol]);
@@ -404,12 +406,12 @@ export default function SendDetailsScreen() {
     txId?: { fee: string; hash: string };
   }) => {
     const fee = transactionResult.txId?.fee;
-    if (!fee || !wdkAsset) return formatTokenAmount(0, tokenSymbol as any);
+    if (!fee || !wdkAsset) return formatTokenAmount(0, tokenSymbol as AssetTicker);
     const feeAsset = USE_NATIVE_COINS ? ethAsset : wdkAsset;
     const display = fromSmallestUnit(fee, feeAsset);
     return USE_NATIVE_COINS
       ? `${display.toFixed(6)} ETH`
-      : formatTokenAmount(display, tokenSymbol as any);
+      : formatTokenAmount(display, tokenSymbol as AssetTicker);
   };
 
   const getTransactionAmout = useCallback(() => {
@@ -417,7 +419,7 @@ export default function SendDetailsScreen() {
     if (inputMode === 'fiat' && tokenPrice > 0) {
       return formatUSDValue(numericAmount);
     }
-    return formatTokenAmount(parseFloat(amount || '0'), tokenSymbol as any);
+    return formatTokenAmount(parseFloat(amount || '0'), tokenSymbol as AssetTicker);
   }, [inputMode, tokenPrice, amount, tokenSymbol]);
 
   // Only disable "Use Max" for BTC (which needs amount for fee estimation).
@@ -534,7 +536,7 @@ export default function SendDetailsScreen() {
                     <Text style={styles.gasAmount}>
                       {USE_NATIVE_COINS
                         ? `${gasEstimate.fee.toFixed(6)} ETH`
-                        : formatTokenAmount(gasEstimate.fee, tokenSymbol as any)}
+                        : formatTokenAmount(gasEstimate.fee, tokenSymbol as AssetTicker)}
                     </Text>
                   </>
                 ) : !recipientAddress ? (

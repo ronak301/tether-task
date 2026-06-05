@@ -1,5 +1,6 @@
 import { useBalancesForWallet, useWalletManager } from '@tetherto/wdk-react-native-core';
 import { useEffect, useRef, useState } from 'react';
+import type { ImageSourcePropType } from 'react-native';
 import { assetConfig } from '@/config/assets';
 import { ethAsset, fromSmallestUnit } from '@/config/wdk-assets';
 import { pricingService, FiatCurrency } from '@/services/pricing-service';
@@ -16,7 +17,7 @@ export interface WalletAsset {
   balance: number;
   fiatValue: number;
   fiatCurrency: FiatCurrency;
-  icon: any;
+  icon: ImageSourcePropType;
   color: string;
 }
 

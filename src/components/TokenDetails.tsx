@@ -5,6 +5,7 @@ import formatTokenAmount from '@/utils/format-token-amount';
 import formatUSDValue from '@/utils/format-usd-value';
 import { Send } from 'lucide-react-native';
 import React from 'react';
+import type { ImageSourcePropType } from 'react-native';
 import { Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { colors } from '@/constants/colors';
 
@@ -18,7 +19,7 @@ interface TokenNetworkBalance {
 interface TokenData {
   symbol: string;
   name: string;
-  icon: any;
+  icon: ImageSourcePropType;
   color: string;
   totalBalance: number;
   totalUSDValue: number;

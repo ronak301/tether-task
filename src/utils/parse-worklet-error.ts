@@ -2,12 +2,13 @@ const ERROR_MESSAGES = {
   '13': 'The biometric authentication was cancelled',
 };
 
-const parseWorkletError = (error: any) => {
-  if (!error.message) {
+const parseWorkletError = (error: unknown) => {
+  const msg = (error as { message?: string })?.message;
+  if (!msg) {
     return undefined;
   }
 
-  const [codeRaw, messageRaw] = error.message.split(',');
+  const [codeRaw, messageRaw] = msg.split(',');
 
   if (codeRaw.trim().startsWith('code:') && messageRaw.trim().startsWith('msg:')) {
     const code = (codeRaw.split(':')[1] || '').trim();

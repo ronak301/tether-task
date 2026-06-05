@@ -14,6 +14,7 @@ import {
 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
+import type { ImageSourcePropType } from 'react-native';
 import {
   ActivityIndicator,
   Animated,
@@ -29,6 +30,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AssetConfig, assetConfig } from '@/config/assets';
 import { FiatCurrency, pricingService } from '@/services/pricing-service';
+import { AssetTicker } from '@/types/wdk';
 import formatTokenAmount from '@/utils/format-token-amount';
 import formatAmount from '@/utils/format-amount';
 import formatUSDValue from '@/utils/format-usd-value';
@@ -52,7 +54,7 @@ type Transaction = {
   asset: string;
   token: string;
   amount: string;
-  icon: any;
+  icon: ImageSourcePropType;
   iconColor: string;
   blockchain: string;
   hash: string;
@@ -137,13 +139,13 @@ export default function WalletScreen() {
         const amount = parseFloat(tx.amount);
         const config = assetConfig[tx.token];
         let fiatAmount = 0;
-        try { fiatAmount = await pricingService.getFiatValue(amount, tx.token as any, FiatCurrency.USD); } catch {}
+        try { fiatAmount = await pricingService.getFiatValue(amount, tx.token as AssetTicker, FiatCurrency.USD); } catch {}
 
         return {
           id: `${tx.transactionHash}-${i}`,
           type: (isSent ? 'sent' : 'received') as 'sent' | 'received',
           token: config?.name ?? tx.token.toUpperCase(),
-          amount: formatTokenAmount(amount, tx.token as any),
+          amount: formatTokenAmount(amount, tx.token as AssetTicker),
           fiatAmount: formatUSDValue(fiatAmount, false),
           fiatCurrency: FiatCurrency.USD,
           network: tx.blockchain.charAt(0).toUpperCase() + tx.blockchain.slice(1),

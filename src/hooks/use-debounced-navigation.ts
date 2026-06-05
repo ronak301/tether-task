@@ -1,3 +1,4 @@
+import type { Href } from 'expo-router';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef } from 'react';
 
@@ -20,13 +21,13 @@ export function useDebouncedNavigation(delay = 300) {
   }, []);
 
   const push = useCallback(
-    (path: string | { pathname: string; params?: Record<string, any> }) => {
+    (path: Href) => {
       if (isNavigatingRef.current) {
         return;
       }
 
       isNavigatingRef.current = true;
-      router.push(path as any);
+      router.push(path);
 
       const timeoutId = setTimeout(() => {
         isNavigatingRef.current = false;
@@ -38,13 +39,13 @@ export function useDebouncedNavigation(delay = 300) {
   );
 
   const replace = useCallback(
-    (path: string | { pathname: string; params?: Record<string, any> }) => {
+    (path: Href) => {
       if (isNavigatingRef.current) {
         return;
       }
 
       isNavigatingRef.current = true;
-      router.replace(path as any);
+      router.replace(path);
 
       const timeoutId = setTimeout(() => {
         isNavigatingRef.current = false;
@@ -71,7 +72,7 @@ export function useDebouncedNavigation(delay = 300) {
   }, [router, delay]);
 
   const dismissAll = useCallback(
-    (navigateTo?: string | { pathname: string; params?: Record<string, any> }) => {
+    (navigateTo?: Href) => {
       if (isNavigatingRef.current) {
         return;
       }
@@ -80,7 +81,7 @@ export function useDebouncedNavigation(delay = 300) {
       router.dismissAll();
 
       if (navigateTo) {
-        router.replace(navigateTo as any);
+        router.replace(navigateTo);
       }
 
       const timeoutId = setTimeout(() => {

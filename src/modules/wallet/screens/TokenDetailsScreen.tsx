@@ -6,6 +6,7 @@ import formatAmount from '@/utils/format-amount';
 import { useLocalSearchParams } from 'expo-router';
 import { useDebouncedNavigation } from '@/hooks/use-debounced-navigation';
 import React, { useEffect, useState } from 'react';
+import type { ImageSourcePropType } from 'react-native';
 import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TokenDetails } from '@/components/TokenDetails';
@@ -29,7 +30,7 @@ export default function TokenDetailsScreen() {
   const [tokenData, setTokenData] = useState<{
     symbol: string;
     name: string;
-    icon: any;
+    icon: ImageSourcePropType;
     color: string;
     totalBalance: number;
     totalUSDValue: number;
