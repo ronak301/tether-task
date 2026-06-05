@@ -1,17 +1,15 @@
 import { BalanceLoader } from '@/modules/wallet/components/BalanceLoader';
-import { useWalletManager, useAddresses, useWdkApp, useRefreshBalance } from '@tetherto/wdk-react-native-core';
+import {
+  useWalletManager,
+  useAddresses,
+  useWdkApp,
+  useRefreshBalance,
+} from '@tetherto/wdk-react-native-core';
 import { Balance } from '@tetherto/wdk-uikit-react-native';
-import { useIndexerBalances } from '@/hooks/use-indexer-balances';
 import { useWalletBalances } from '@/modules/wallet/hooks/use-wallet-balances';
 import { isLockSuppressed } from '@/modules/auth/utils/biometric-auth';
 import { useDebouncedNavigation } from '@/hooks/use-debounced-navigation';
-import {
-  ArrowDownLeft,
-  ArrowUpRight,
-  ChevronDown,
-  QrCode,
-  Settings,
-} from 'lucide-react-native';
+import { ArrowDownLeft, ArrowUpRight, ChevronDown, QrCode, Settings } from 'lucide-react-native';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 import type { ImageSourcePropType } from 'react-native';
@@ -67,9 +65,8 @@ export default function WalletScreen() {
   const router = useDebouncedNavigation();
   const { activeWalletId, status, lock } = useWalletManager();
   const { state: appState } = useWdkApp();
-  const { data: addressData } = useAddresses();
-  const { assets: walletAssets, totalUSD, isLoading } = useWalletBalances();
-  const { refetch: refetchIndexer } = useIndexerBalances();
+  const { data: addressData, loadAddresses } = useAddresses();
+  const { assets: walletAssets, totalUSD, isLoading, refetchIndexer } = useWalletBalances();
   const { mutateAsync: refreshBalance } = useRefreshBalance();
   const walletTransactions = useTransactions();
   const [refreshing, setRefreshing] = useState(false);
@@ -80,6 +77,12 @@ export default function WalletScreen() {
   const scrollY = useRef(new Animated.Value(0)).current;
 
   const hasWallet = !!activeWalletId;
+  // Fire a one-time indexer fetch as soon as WDK finishes async-initializing
+  // the wallet's addresses after import/creation, in case useFocusEffect fired
+  // before addresses were available (addresses=undefined → skipped the fetch).
+  useEffect(() => {
+    loadAddresses([0]);
+  }, [loadAddresses]);
 
   const parseWalletDisplayName = (walletId: string): string => {
     const match = walletId.match(/^wallet_(.+)_\d+$/);
@@ -128,10 +131,9 @@ export default function WalletScreen() {
     extrapolate: 'clamp',
   });
 
-
   // Build latest 2 transactions from the indexer (USDT/XAUt transfers).
   const getTransactions = async (): Promise<UITransaction[]> => {
-    const walletAddresses = (addressData ?? []).map(a => a.address.toLowerCase());
+    const walletAddresses = (addressData ?? []).map((a) => a.address.toLowerCase());
 
     const items = await Promise.all(
       walletTransactions.list.slice(0, 2).map(async (tx, i) => {
@@ -139,7 +141,13 @@ export default function WalletScreen() {
         const amount = parseFloat(tx.amount);
         const config = assetConfig[tx.token];
         let fiatAmount = 0;
-        try { fiatAmount = await pricingService.getFiatValue(amount, tx.token as AssetTicker, FiatCurrency.USD); } catch {}
+        try {
+          fiatAmount = await pricingService.getFiatValue(
+            amount,
+            tx.token as AssetTicker,
+            FiatCurrency.USD
+          );
+        } catch {}
 
         return {
           id: `${tx.transactionHash}-${i}`,
@@ -309,7 +317,7 @@ export default function WalletScreen() {
         {/* Portfolio */}
         <View style={styles.portfolioSection}>
           {walletAssets.length > 0 ? (
-            walletAssets.map(asset => (
+            walletAssets.map((asset) => (
               <TouchableOpacity
                 key={asset.id}
                 style={styles.assetRow}
@@ -350,7 +358,12 @@ export default function WalletScreen() {
         {/* Activity */}
         <View style={styles.activitySection}>
           <View
-            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: 12,
+            }}
           >
             <Text style={styles.sectionTitle}>Activity</Text>
             {walletTransactions.isLoading ? (
@@ -358,13 +371,10 @@ export default function WalletScreen() {
                 <ActivityIndicator size="small" color={colors.primary} />
               </View>
             ) : null}
-
           </View>
 
           {transactions.length > 0 ? (
-            transactions.map(tx => (
-              <TransactionItem key={tx.id} transaction={tx} />
-            ))
+            transactions.map((tx) => <TransactionItem key={tx.id} transaction={tx} />)
           ) : (
             <View style={styles.noAssetsContainer}>
               <Text style={styles.noAssetsText}>No transactions yet</Text>

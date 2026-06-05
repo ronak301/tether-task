@@ -25,12 +25,17 @@ interface UseWalletBalancesResult {
   assets: WalletAsset[];
   totalUSD: number;
   isLoading: boolean;
+  refetchIndexer: () => void;
 }
 
 export function useWalletBalances(): UseWalletBalancesResult {
   const { activeWalletId } = useWalletManager();
   const { data: ethResults, isLoading: isEthLoading } = useBalancesForWallet(0, [ethAsset]);
-  const { balances: indexerBalances, isLoading: isIndexerLoading } = useIndexerBalances();
+  const {
+    balances: indexerBalances,
+    isLoading: isIndexerLoading,
+    refetch: refetchIndexer,
+  } = useIndexerBalances();
   const [assets, setAssets] = useState<WalletAsset[]>([]);
   // Shadow ethResults with wallet-scoped state so stale data from the previous
   // wallet is never used when indexerBalances refreshes first after a switch.
@@ -62,6 +67,8 @@ export function useWalletBalances(): UseWalletBalancesResult {
   }, [ethResults]);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function build() {
       const map = new Map<string, number>();
 
@@ -85,7 +92,11 @@ export function useWalletBalances(): UseWalletBalancesResult {
         if (!config) return null;
         let fiatValue = 0;
         try {
-          fiatValue = await pricingService.getFiatValue(balance, tokenId as AssetTicker, FiatCurrency.USD);
+          fiatValue = await pricingService.getFiatValue(
+            balance,
+            tokenId as AssetTicker,
+            FiatCurrency.USD
+          );
         } catch {
           // Pricing unavailable — show balance without USD value.
         }
@@ -106,13 +117,16 @@ export function useWalletBalances(): UseWalletBalancesResult {
         .filter((a): a is WalletAsset => a !== null)
         .sort((a, b) => b.fiatValue - a.fiatValue);
 
-      setAssets(built);
+      if (!cancelled) setAssets(built);
     }
 
     build();
+    return () => {
+      cancelled = true;
+    };
   }, [activeEthResults, indexerBalances]);
 
   const totalUSD = assets.reduce((sum, a) => sum + a.fiatValue, 0);
 
-  return { assets, totalUSD, isLoading };
+  return { assets, totalUSD, isLoading, refetchIndexer };
 }
