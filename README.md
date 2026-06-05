@@ -2,6 +2,10 @@
 
 A non-custodial Ethereum wallet built on the WDK (Wallet Development Kit) starter kit. Supports wallet creation, import, multi-wallet switching, USDT / XAUt / ETH balances, send, receive, and transaction history — all on Sepolia testnet.
 
+## Demo
+
+[![Demo](assets/docs/demo-thumbnail.png)](assets/docs/demo.mov)
+
 ---
 
 ## Run
